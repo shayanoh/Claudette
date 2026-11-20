@@ -55,22 +55,14 @@ final class PropNode: SKNode {
     return n
   }
 
-  func label(_ text: String, y: CGFloat = -34, size: CGFloat = 10) {
-    let l = SKLabelNode(text: text)
-    l.fontName = "AvenirNext-DemiBold"
-    l.fontSize = size
-    l.fontColor = .white
-    l.verticalAlignmentMode = .top
-    l.position = CGPoint(x: 0, y: y)
-    // dark outline for legibility on any wallpaper
-    let outline = SKLabelNode(text: text)
-    outline.fontName = l.fontName
-    outline.fontSize = size
-    outline.fontColor = Palette.ink
-    outline.verticalAlignmentMode = .top
-    outline.position = CGPoint(x: 1, y: y - 1)
-    body.addChild(outline)
-    body.addChild(l)
+  /// A caption under the prop: white text with one soft shadow (see `LabelTexture`).
+  func label(_ text: String, y: CGFloat = -34, size: CGFloat = 13) {
+    guard let entry = LabelTexture.entry(text, size: size) else { return }
+    let sprite = SKSpriteNode(texture: entry.texture, size: entry.size)
+    sprite.anchorPoint = CGPoint(x: 0.5, y: 1)
+    // The texture's top edge is `padding` above the glyphs.
+    sprite.position = CGPoint(x: 0, y: y + LabelTexture.padding)
+    body.addChild(sprite)
   }
 
   static func shorten(_ s: String, _ n: Int = 16) -> String {

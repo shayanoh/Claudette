@@ -35,6 +35,17 @@ if let i = args.firstIndex(of: "--validate-art") {
   }
 }
 
+// Developer helper: `Claudette --render-props <png>` draws a sheet of props on a light and a dark
+// backdrop (label legibility) and exits.
+if let i = args.firstIndex(of: "--render-props") {
+  guard i + 1 < args.count else {
+    FileHandle.standardError.write(Data("usage: Claudette --render-props <png>\n".utf8))
+    exit(2)
+  }
+  _ = NSApplication.shared
+  exit(PropSheet.render(to: URL(fileURLWithPath: args[i + 1])) ? 0 : 1)
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
