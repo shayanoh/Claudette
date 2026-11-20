@@ -42,13 +42,27 @@ public final class LimitsModel {
     apply(.sevenDay, payload.sevenDay)
   }
 
-  /// A rate-limit StopFailure means we are in limit even if no percentage says so. The window
-  /// is unknown, so the 5-hour window is assumed (the common case).
+  /// A rate-limit StopFailure means we are in limit even if no percentage says so. The failure
+  /// does not say which window ran out, so the window with the higher reading is blamed (the
+  /// 5-hour window when there is no data). Without a reset time the window's own length is the
+  /// fallback, so a limit can never stay on forever.
   public func ingestRateLimitFailure(resetsAt: Date?) {
-    let kind = LimitKind.fiveHour
-    let reset = resetsAt ?? state(kind).resetsAt
+    let five = state(.fiveHour).usedPercentage ?? -1
+    let seven = state(.sevenDay).usedPercentage ?? -1
+    let kind: LimitKind = seven > five ? .sevenDay : .fiveHour
+    let length: TimeInterval = kind == .fiveHour ? 5 * 3600 : 7 * 86400
+    let reset = resetsAt ?? state(kind).resetsAt ?? now().addingTimeInterval(length)
     forced.insert(kind)
     set(kind, WindowState(status: .inLimit, usedPercentage: 100, resetsAt: reset))
+  }
+
+  /// Claude Code completed real work again (a tool call succeeded): a limit that was only
+  /// inferred from a failure is over. Limits backed by a usage percentage are left alone.
+  public func noteSuccessfulWork() {
+    for kind in forced {
+      forced.remove(kind)
+      set(kind, WindowState(status: .fresh, usedPercentage: 0, resetsAt: nil))
+    }
   }
 
   /// Call about once a second: lifts limits whose reset time has passed.

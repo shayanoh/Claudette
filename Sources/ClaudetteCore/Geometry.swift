@@ -9,16 +9,24 @@ public enum ScreenFit {
   /// The sprite's new origin: inside the nearest screen. A sprite bigger than that screen in one
   /// dimension is centred in that dimension. With no screens the origin is returned unchanged.
   public static func clamp(_ origin: CGPoint, size: CGSize, to screens: [CGRect]) -> CGPoint {
-    let c = CGPoint(x: origin.x + size.width / 2, y: origin.y + size.height / 2)
-    guard let s = screens.min(by: { distance(c, to: $0) < distance(c, to: $1) }) else {
+    guard let i = nearestScreenIndex(for: origin, size: size, screens: screens) else {
       return origin
     }
+    let s = screens[i]
     func fit(_ o: CGFloat, _ len: CGFloat, _ lo: CGFloat, _ hi: CGFloat) -> CGFloat {
       if len >= hi - lo { return lo + (hi - lo - len) / 2 }
       return min(max(o.isFinite ? o : lo, lo), hi - len)
     }
     return CGPoint(
       x: fit(origin.x, size.width, s.minX, s.maxX), y: fit(origin.y, size.height, s.minY, s.maxY))
+  }
+
+  /// Index of the screen nearest to the sprite's centre (nil when there are no screens).
+  public static func nearestScreenIndex(for origin: CGPoint, size: CGSize, screens: [CGRect])
+    -> Int?
+  {
+    let c = CGPoint(x: origin.x + size.width / 2, y: origin.y + size.height / 2)
+    return screens.indices.min { distance(c, to: screens[$0]) < distance(c, to: screens[$1]) }
   }
 
   private static func distance(_ p: CGPoint, to r: CGRect) -> CGFloat {
@@ -163,5 +171,25 @@ public struct DragPhysics {
       path.append(p)
     }
     return path
+  }
+}
+
+/// The colour of the little status dot on the menubar glyph.
+public enum AttentionDot: Equatable, Sendable {
+  case approval, question, error
+
+  /// Errors and limits win over approval requests, which win over questions.
+  public static func pick(phases: [SessionPhase], inLimit: Bool) -> AttentionDot? {
+    if inLimit { return .error }
+    var best: AttentionDot?
+    for phase in phases {
+      switch phase {
+      case .error: return .error
+      case .needsApproval: best = .approval
+      case .hasQuestion: if best == nil { best = .question }
+      default: break
+      }
+    }
+    return best
   }
 }

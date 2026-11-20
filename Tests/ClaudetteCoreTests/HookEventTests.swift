@@ -96,3 +96,12 @@ private func data(_ json: String) -> Data { Data(json.utf8) }
     data(#"{"hook_event_name":"PreToolUse","session_id":"s1","tool_name":"Read"}"#))
   #expect(e.mcpServerName == nil)
 }
+
+@Test func decodesTheRealStopFailureErrorField() throws {
+  // Captured from a real Claude Code 2.1.329 session (not logged in).
+  let e = try HookEvent.decode(
+    Data(
+      #"{"hook_event_name":"StopFailure","session_id":"s1","error":"authentication_failed","last_assistant_message":"Not logged in"}"#
+        .utf8))
+  #expect(e.errorType == "authentication_failed")
+}

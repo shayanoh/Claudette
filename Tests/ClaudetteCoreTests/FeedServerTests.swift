@@ -157,3 +157,61 @@ private let goodHook = Data(#"{"hook_event_name":"Stop","session_id":"s1"}"#.utf
     _ = try await URLSession.shared.data(for: req)
   }
 }
+
+/// Sends a raw HTTP request over a socket and returns the status code (nil if the server hung up).
+private func rawStatus(_ port: UInt16, _ request: String) -> Int? {
+  let fd = socket(AF_INET, SOCK_STREAM, 0)
+  defer { close(fd) }
+  var addr = sockaddr_in()
+  addr.sin_family = sa_family_t(AF_INET)
+  addr.sin_port = port.bigEndian
+  addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+  let rc = withUnsafePointer(to: &addr) {
+    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+      connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+    }
+  }
+  guard rc == 0 else { return nil }
+  let bytes = Array(request.utf8)
+  _ = bytes.withUnsafeBytes { send(fd, $0.baseAddress, bytes.count, 0) }
+  var tv = timeval(tv_sec: 3, tv_usec: 0)
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+  var buf = [UInt8](repeating: 0, count: 256)
+  let n = recv(fd, &buf, buf.count, 0)
+  guard n > 12 else { return nil }
+  return Int(String(decoding: buf[9..<12], as: UTF8.self))
+}
+
+private func hookRequest(host: String?, extra: String = "") -> String {
+  let body = #"{"hook_event_name":"Stop","session_id":"s1"}"#
+  var r = "POST /hook HTTP/1.1\r\n"
+  if let host { r += "Host: \(host)\r\n" }
+  r += extra
+  r += "Content-Type: text/plain\r\nContent-Length: \(body.utf8.count)\r\n\r\n\(body)"
+  return r
+}
+
+@Test func requestFromABrowserOriginIsRejected() throws {
+  let (server, inbox, port) = try makeServer()
+  defer { server.stop() }
+  let status = rawStatus(
+    port, hookRequest(host: "127.0.0.1:\(port)", extra: "Origin: https://evil.example\r\n"))
+  #expect(status == 403)
+  #expect(inbox.all.isEmpty)
+}
+
+@Test func foreignHostHeaderIsRejectedAgainstDNSRebinding() throws {
+  let (server, inbox, port) = try makeServer()
+  defer { server.stop() }
+  #expect(rawStatus(port, hookRequest(host: "evil.example:\(port)")) == 403)
+  #expect(inbox.all.isEmpty)
+}
+
+@Test func loopbackHostNamesAreAccepted() throws {
+  let (server, inbox, port) = try makeServer()
+  defer { server.stop() }
+  #expect(rawStatus(port, hookRequest(host: "127.0.0.1:\(port)")) == 200)
+  #expect(rawStatus(port, hookRequest(host: "localhost:\(port)")) == 200)
+  #expect(rawStatus(port, hookRequest(host: nil)) == 200)  // curl-like clients without Host
+  #expect(inbox.all.count == 3)
+}

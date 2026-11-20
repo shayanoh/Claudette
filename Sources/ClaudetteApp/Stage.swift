@@ -278,7 +278,15 @@ final class Stage {
   private func screensChanged() {
     for a in actors.values {
       if screen(a.display) == nil, let main = overlay.mainDisplayID { a.display = main }
+      // The clamp may move her onto another screen: her display (and scene) must follow.
+      if let i = ScreenFit.nearestScreenIndex(
+        for: a.origin, size: spriteSize, screens: screenFrames),
+        let id = OverlayController.displayID(of: NSScreen.screens[i])
+      {
+        a.display = id
+      }
       a.origin = ScreenFit.clamp(a.origin, size: spriteSize, to: screenFrames)
+      applyDisplayParent(a)
     }
     relayout()
   }

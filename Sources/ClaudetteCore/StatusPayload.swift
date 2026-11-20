@@ -10,8 +10,14 @@ public struct LimitWindow: Equatable, Sendable {
   public let resetsAt: Date
 
   /// Clamps the percentage to 0...100; non-finite values are rejected.
+  /// Reset times further away than `maxResetHorizon` are rejected: windows are at most a week long,
+  /// and absurd values (from a bug or a forged payload) must never reach date arithmetic.
+  public static let maxResetHorizon: TimeInterval = 8 * 86400
+
   public init?(usedPercentage: Double, resetsAt: Date) {
-    guard usedPercentage.isFinite else { return nil }
+    guard usedPercentage.isFinite, resetsAt.timeIntervalSinceNow < Self.maxResetHorizon else {
+      return nil
+    }
     self.usedPercentage = min(100, max(0, usedPercentage))
     self.resetsAt = resetsAt
   }

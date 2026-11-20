@@ -7,7 +7,9 @@ import SpriteKit
 
 enum LimitText {
   static func remaining(until date: Date, now: Date) -> String {
-    let mins = max(0, Int(date.timeIntervalSince(now) / 60))
+    let secs = date.timeIntervalSince(now)
+    // Clamp before converting: Int(_:) traps on huge or non-finite doubles.
+    let mins = secs.isFinite ? Int(max(0, min(secs / 60, 10_000_000))) : 0
     return mins >= 60 ? "in \(mins / 60)h \(mins % 60)m" : "in \(mins)m"
   }
 
@@ -196,11 +198,16 @@ final class LimitsHUD {
     self.stage = stage
     self.overlay = overlay
     self.settings = settings
-    limits.onTransition = { [weak self] kind, _, new in
-      if kind == .fiveHour { self?.setNight(new == .inLimit) }
-      self?.refresh()
+    limits.onTransition = { [weak self] _, _, _ in
+      guard let self else { return }
+      self.setNight(self.anyLimit)
+      self.refresh()
     }
     limits.onLifted = { [weak self] _ in self?.celebrate() }
+  }
+
+  private var anyLimit: Bool {
+    limits.state(.fiveHour).status == .inLimit || limits.state(.sevenDay).status == .inLimit
   }
 
   func refresh() {
@@ -235,10 +242,12 @@ final class LimitsHUD {
   }
 
   private func statusDot() -> NSColor? {
-    if limits.state(.fiveHour).status == .inLimit || limits.state(.sevenDay).status == .inLimit {
-      return Palette.error
+    switch AttentionDot.pick(phases: stage.actors.values.map(\.lastPhase), inLimit: anyLimit) {
+    case .error: return Palette.error
+    case .approval: return Palette.approval
+    case .question: return Palette.question
+    case nil: return nil
     }
-    return nil
   }
 
   private func showSign(on puppet: SKNode, until: Date?) {
@@ -261,21 +270,24 @@ final class LimitsHUD {
     puppet.addChild(sign)
   }
 
+  /// A dark night patch behind each napping Claudette (not the whole desktop).
+  private func showNight(on puppet: SKNode) {
+    guard puppet.childNode(withName: "night") == nil else { return }
+    let patch = SKShapeNode(
+      rect: CGRect(x: -150, y: -24, width: 300, height: 250), cornerRadius: 60)
+    patch.name = "night"
+    patch.fillColor = Palette.hex(0x1D2440).withAlphaComponent(0.55)
+    patch.strokeColor = .clear
+    patch.zPosition = -50
+    patch.alpha = 0
+    puppet.addChild(patch)
+    patch.run(.fadeIn(withDuration: 1.0))
+  }
+
   private func setNight(_ on: Bool) {
     guard on != dimmed else { return }
-    stage.noteActivity()
     dimmed = on
-    for o in overlay.overlays.values {
-      o.scene.childNode(withName: "night")?.removeFromParent()
-      guard on else { continue }
-      let night = SKSpriteNode(color: Palette.hex(0x1D2440), size: o.scene.size)
-      night.name = "night"
-      night.anchorPoint = .zero
-      night.zPosition = -100
-      night.alpha = 0
-      o.scene.addChild(night)
-      night.run(.fadeAlpha(to: 0.4, duration: 1.0))
-    }
+    stage.noteActivity()
     for a in stage.actors.values {
       if on { a.puppet.sleep() } else { a.puppet.idle() }
     }

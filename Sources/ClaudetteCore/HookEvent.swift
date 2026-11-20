@@ -44,7 +44,8 @@ public struct HookEvent: Equatable, Sendable {
       toolUseID: raw["tool_use_id"]?.stringValue,
       mcpServerName: server,
       notificationType: raw["notification_type"]?.stringValue,
-      errorType: raw["error_type"]?.stringValue,
+      // Real StopFailure payloads use `error`; `error_type` is kept as a fallback.
+      errorType: raw["error"]?.stringValue ?? raw["error_type"]?.stringValue,
       toolInput: raw["tool_input"],
       raw: raw)
   }

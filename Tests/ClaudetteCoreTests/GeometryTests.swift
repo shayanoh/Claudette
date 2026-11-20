@@ -211,3 +211,26 @@ private func center(_ origin: CGPoint, _ s: CGSize = size) -> CGPoint {
       == nil)
   #expect(Placement.layout(count: 3, screen: .zero, spriteSize: size).full.count <= 1)
 }
+
+@Test func nearestScreenIndexFollowsTheSpritesCentre() {
+  let right = CGRect(x: 1440, y: 0, width: 1440, height: 900)
+  #expect(
+    ScreenFit.nearestScreenIndex(
+      for: CGPoint(x: 100, y: 100), size: size, screens: [screen, right]) == 0)
+  #expect(
+    ScreenFit.nearestScreenIndex(
+      for: CGPoint(x: 1500, y: 100), size: size, screens: [screen, right]) == 1)
+  #expect(
+    ScreenFit.nearestScreenIndex(
+      for: CGPoint(x: 9000, y: 100), size: size, screens: [screen, right]) == 1)
+  #expect(ScreenFit.nearestScreenIndex(for: .zero, size: size, screens: []) == nil)
+}
+
+@Test func attentionDotPriority() {
+  #expect(AttentionDot.pick(phases: [.idle, .working], inLimit: false) == nil)
+  #expect(AttentionDot.pick(phases: [.working, .hasQuestion], inLimit: false) == .question)
+  #expect(AttentionDot.pick(phases: [.hasQuestion, .needsApproval], inLimit: false) == .approval)
+  #expect(AttentionDot.pick(phases: [.needsApproval, .error(.api)], inLimit: false) == .error)
+  #expect(AttentionDot.pick(phases: [.idle], inLimit: true) == .error)
+  #expect(AttentionDot.pick(phases: [], inLimit: false) == nil)
+}

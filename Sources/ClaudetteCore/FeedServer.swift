@@ -61,6 +61,17 @@ public final class FeedServer: @unchecked Sendable {
     boundPort = nil
   }
 
+  /// `127.0.0.1`, `localhost` or `[::1]`, with or without a port.
+  static func isLoopbackHost(_ header: String) -> Bool {
+    var host = header.lowercased()
+    if host.hasPrefix("[") {
+      host = String(host.dropFirst().prefix { $0 != "]" })
+    } else if let colon = host.lastIndex(of: ":") {
+      host = String(host[..<colon])
+    }
+    return host == "127.0.0.1" || host == "localhost" || host == "::1"
+  }
+
   // MARK: - Connection handling
 
   private func accept(_ conn: NWConnection) {
@@ -140,11 +151,8 @@ public final class FeedServer: @unchecked Sendable {
         finish(400)
         return nil
       }
-      guard parts[0] == "POST" else { return 405 }
-      let path = String(parts[1])
-      guard path == "/hook" || path == "/status" else { return 404 }
-      route = path
       var length: Int?
+      var transferEncoding = false
       for line in lines.dropFirst() {
         let kv = line.split(separator: ":", maxSplits: 1).map {
           $0.trimmingCharacters(in: .whitespaces)
@@ -152,10 +160,19 @@ public final class FeedServer: @unchecked Sendable {
         guard kv.count == 2 else { continue }
         switch kv[0].lowercased() {
         case "content-length": length = Int(kv[1])
-        case "transfer-encoding": return 411
+        case "transfer-encoding": transferEncoding = true
+        // Browsers always send Origin; Claude Code's hooks and curl never do. Refusing it keeps
+        // web pages from posting fake events. A foreign Host defeats DNS rebinding.
+        case "origin": return 403
+        case "host": if !FeedServer.isLoopbackHost(kv[1]) { return 403 }
         default: break
         }
       }
+      guard parts[0] == "POST" else { return 405 }
+      let path = String(parts[1])
+      guard path == "/hook" || path == "/status" else { return 404 }
+      route = path
+      if transferEncoding { return 411 }
       guard let length, length >= 0 else { return 411 }
       guard length <= FeedServer.maxBody else { return 413 }
       contentLength = length
@@ -183,6 +200,7 @@ public final class FeedServer: @unchecked Sendable {
       switch status {
       case 200: reason = "OK"
       case 400: reason = "Bad Request"
+      case 403: reason = "Forbidden"
       case 404: reason = "Not Found"
       case 405: reason = "Method Not Allowed"
       case 408: reason = "Request Timeout"

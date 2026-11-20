@@ -20,15 +20,21 @@ public enum StatusLineInstaller {
   // MARK: - Public API
 
   public static func install(
-    settingsURL: URL, wrapperPath: String, stateDir: URL, port: Int
+    settingsURL rawSettingsURL: URL, wrapperPath: String, stateDir: URL, port: Int
   ) throws -> InstallOutcome {
     let fm = FileManager.default
+    // A symlinked settings file (dotfile managers) must stay a symlink: edit its target.
+    let settingsURL = rawSettingsURL.resolvingSymlinksInPath()
     let existing: Data? =
       fm.fileExists(atPath: settingsURL.path) ? try Data(contentsOf: settingsURL) : nil
     var settings = try parseSettings(existing)
     let ours = shellQuote(wrapperPath)
     let current = settings["statusLine"]
     if let obj = current as? [String: Any], obj["command"] as? String == ours {
+      if !fm.isExecutableFile(atPath: wrapperPath) {  // repair a deleted wrapper script
+        try writeWrapper(wrapperPath: wrapperPath, stateDir: stateDir, port: port)
+        return .installed
+      }
       return .alreadyInstalled
     }
 
@@ -42,9 +48,7 @@ public enum StatusLineInstaller {
     try JSONSerialization.data(withJSONObject: originalValue, options: [.fragmentsAllowed]).write(
       to: stateDir.appendingPathComponent(originalName), options: .atomic)
 
-    try Data(wrapperScript(stateDir: stateDir, port: port).utf8).write(
-      to: URL(fileURLWithPath: wrapperPath), options: .atomic)
-    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: wrapperPath)
+    try writeWrapper(wrapperPath: wrapperPath, stateDir: stateDir, port: port)
 
     var entry = (current as? [String: Any]) ?? [:]
     entry["type"] = "command"
@@ -60,19 +64,27 @@ public enum StatusLineInstaller {
   }
 
   public static func uninstall(
-    settingsURL: URL, wrapperPath: String, stateDir: URL
+    settingsURL rawSettingsURL: URL, wrapperPath: String, stateDir: URL
   ) throws -> UninstallOutcome {
     let fm = FileManager.default
+    let settingsURL = rawSettingsURL.resolvingSymlinksInPath()
     let hashURL = stateDir.appendingPathComponent(hashName)
     guard fm.fileExists(atPath: hashURL.path) else { return .notInstalled }
-    defer { cleanState(stateDir: stateDir, wrapperPath: wrapperPath) }
 
-    guard fm.fileExists(atPath: settingsURL.path) else { return .notInstalled }
+    // The backup and the saved original are only deleted after a successful outcome: if anything
+    // below throws, they are the only copy of the user's original status line.
+    guard fm.fileExists(atPath: settingsURL.path) else {
+      cleanState(stateDir: stateDir, wrapperPath: wrapperPath)
+      return .notInstalled
+    }
     let current = try Data(contentsOf: settingsURL)
     var settings = try parseSettings(current)
     let ours = shellQuote(wrapperPath)
     guard let entry = settings["statusLine"] as? [String: Any], entry["command"] as? String == ours
-    else { return .leftAlone }  // the user changed it after we installed; not ours to touch
+    else {
+      cleanState(stateDir: stateDir, wrapperPath: wrapperPath)
+      return .leftAlone  // the user changed it after we installed; not ours to touch
+    }
 
     let installedHash = (try? String(contentsOf: hashURL, encoding: .utf8)) ?? ""
     if sha256(current) == installedHash {
@@ -85,6 +97,7 @@ public enum StatusLineInstaller {
       } else {
         try fm.removeItem(at: settingsURL)
       }
+      cleanState(stateDir: stateDir, wrapperPath: wrapperPath)
       return .restored
     }
 
@@ -98,12 +111,14 @@ public enum StatusLineInstaller {
       settings.removeValue(forKey: "statusLine")
     }
     try serialize(settings).write(to: settingsURL, options: .atomic)
+    cleanState(stateDir: stateDir, wrapperPath: wrapperPath)
     return .restored
   }
 
   public static func status(
-    settingsURL: URL, wrapperPath: String, projectSettingsURL: URL?
+    settingsURL rawSettingsURL: URL, wrapperPath: String, projectSettingsURL: URL?
   ) -> InstallState {
+    let settingsURL = rawSettingsURL.resolvingSymlinksInPath()
     guard let data = try? Data(contentsOf: settingsURL),
       let user = (try? parseSettings(data)),
       let entry = user["statusLine"] as? [String: Any],
@@ -147,6 +162,13 @@ public enum StatusLineInstaller {
   }
 
   // MARK: - Helpers
+
+  private static func writeWrapper(wrapperPath: String, stateDir: URL, port: Int) throws {
+    try FileManager.default.createDirectory(at: stateDir, withIntermediateDirectories: true)
+    try Data(wrapperScript(stateDir: stateDir, port: port).utf8).write(
+      to: URL(fileURLWithPath: wrapperPath), options: .atomic)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: wrapperPath)
+  }
 
   static func shellQuote(_ s: String) -> String {
     "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"

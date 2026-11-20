@@ -74,3 +74,18 @@ private func payload(_ json: String) throws -> StatusPayload {
   #expect(throws: (any Error).self) { try payload("nope") }
   #expect(throws: (any Error).self) { try payload(#"{"cwd":"/p"}"#) }
 }
+
+@Test func absurdlyFarResetTimeIsDropped() throws {
+  let p = try payload(
+    #"{"session_id":"s1","rate_limits":{"five_hour":{"used_percentage":50,"resets_at":1e300},"seven_day":{"used_percentage":50,"resets_at":9999999999999}}}"#
+  )
+  #expect(p.fiveHour == nil)
+  #expect(p.sevenDay == nil)
+}
+
+@Test func resetTimeWithinAWeekIsKept() throws {
+  let soon = Date().addingTimeInterval(6 * 86400).timeIntervalSince1970
+  let p = try payload(
+    #"{"session_id":"s1","rate_limits":{"seven_day":{"used_percentage":50,"resets_at":\#(soon)}}}"#)
+  #expect(p.sevenDay != nil)
+}

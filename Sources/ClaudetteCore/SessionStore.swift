@@ -51,6 +51,8 @@ public final class SessionStore {
   public static let sleepAfter: TimeInterval = 15 * 60
   public static let removeAfter: TimeInterval = 60 * 60
   static let lateEventWindow: TimeInterval = 60
+  /// More sessions than this are ignored (a flood of junk must not fill the screen).
+  public static let maxSessions = 64
 
   private struct Entry {
     var state: SessionState
@@ -90,6 +92,7 @@ public final class SessionStore {
 
     var changes: [SessionChange] = []
     if entries[id] == nil {
+      guard entries.count < Self.maxSessions else { return [] }
       entries[id] = Entry(
         state: SessionState(
           id: id, cwd: e.cwd, phase: .idle, activeTools: [], subagents: [], model: nil,
@@ -161,6 +164,7 @@ public final class SessionStore {
     if endedAt[id] != nil { return [] }
     var changes: [SessionChange] = []
     if entries[id] == nil {
+      guard entries.count < Self.maxSessions else { return [] }
       entries[id] = Entry(
         state: SessionState(
           id: id, cwd: p.cwd, phase: .idle, activeTools: [], subagents: [], model: nil,
@@ -195,7 +199,7 @@ public final class SessionStore {
       }
       entries[id] = entry
       let silent = t.timeIntervalSince(entry.state.lastEventAt)
-      if silent >= Self.removeAfter {
+      if silent >= Self.removeAfter, entry.attention == nil {  // never drop one that is waiting for you
         entries[id] = nil
         endedAt[id] = t
         changes.append(.ended(id))

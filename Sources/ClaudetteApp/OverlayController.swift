@@ -63,9 +63,11 @@ final class OverlayController {
     }
   }
   private var paused = false
+  private var frameRate = Stage.activeFPS
 
   /// Idle scenes only breathe and blink, so they run slowly; anything lively asks for full speed.
   func setFrameRate(_ fps: Int) {
+    frameRate = fps
     overlays.values.forEach { $0.view.preferredFramesPerSecond = fps }
   }
 
@@ -118,14 +120,15 @@ final class OverlayController {
     let view = StageView(frame: CGRect(origin: .zero, size: screen.frame.size))
     view.handler = mouseHandler
     view.allowsTransparency = true
-    view.preferredFramesPerSecond = Stage.activeFPS
+    view.preferredFramesPerSecond = frameRate
+    view.isPaused = paused || focusHidden
     view.ignoresSiblingOrder = true
     let scene = SKScene(size: screen.frame.size)
     scene.backgroundColor = .clear
     scene.scaleMode = .resizeFill
     view.presentScene(scene)
     panel.contentView = view
-    panel.orderFrontRegardless()
+    if !focusHidden { panel.orderFrontRegardless() }
     return Overlay(panel: panel, view: view, scene: scene)
   }
 }

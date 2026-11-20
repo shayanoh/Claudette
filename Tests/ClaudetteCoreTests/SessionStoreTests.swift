@@ -260,3 +260,26 @@ private func status(_ session: String = "s1", model: String? = nil, ctx: Double?
   #expect(s.sessions["a"]?.phase == .working)
   #expect(s.sessions["b"]?.phase == .idle)
 }
+
+@Test func sessionCountIsCappedSoJunkCannotFloodTheScreen() {
+  let (s, _) = make()
+  for i in 0..<(SessionStore.maxSessions + 20) { _ = s.apply(ev("SessionStart", session: "s\(i)")) }
+  #expect(s.sessions.count == SessionStore.maxSessions)
+  #expect(s.apply(ev("SessionStart", session: "one-more")).isEmpty)
+  // an existing session keeps working
+  #expect(!s.apply(ev("PreToolUse", session: "s0", tool: "Read", id: "t")).isEmpty)
+}
+
+@Test func sessionWaitingForYouIsNotRemovedBySilence() {
+  let (s, c) = make()
+  _ = s.apply(ev("PermissionRequest", tool: "Write"))
+  c.advance(2 * 3600)
+  #expect(!s.tick().contains(.ended("s1")))
+  #expect(s.sessions["s1"]?.phase == .needsApproval)
+}
+
+@Test func realStopFailureErrorFieldMapsToErrorKind() {
+  let (s, _) = make()
+  _ = s.apply(ev("StopFailure", extra: #""error":"rate_limit""#))
+  #expect(s.sessions["s1"]?.phase == .error(.rateLimit))
+}

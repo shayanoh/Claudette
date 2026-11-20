@@ -31,6 +31,7 @@ final class AppModel {
     }
     _ = stage
     _ = hud
+    stage.settingsChanged()  // applies a saved Focus mode and size right away
     let server = FeedServer(port: Self.feedPort) { [weak self] message in
       DispatchQueue.main.async { self?.handle(message) }
     }
@@ -55,6 +56,8 @@ final class AppModel {
     case .hook(let event):
       if event.name == "StopFailure", event.errorType == "rate_limit" {
         limits.ingestRateLimitFailure(resetsAt: nil)
+      } else if event.name == "PostToolUse" {
+        limits.noteSuccessfulWork()  // real work succeeded: an inferred limit is over
       }
       stage.apply(store.apply(event), sessions: store.sessions)
       hud.refresh()

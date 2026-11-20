@@ -186,6 +186,51 @@ private func command(_ json: [String: Any]) -> String? {
       == .overriddenByProject)
 }
 
+@Test func uninstallKeepsBackupWhenSettingsAreUnreadable() throws {
+  let e = Env()
+  defer { e.cleanup() }
+  e.write(#"{"statusLine":{"type":"command","command":"echo hi"}}"#)
+  _ = try e.install()
+  let good = e.read()
+  e.write(#"{"statusLine": {"command": "x""#)  // the user broke the file (truncated)
+  #expect(throws: InstallError.settingsNotValidJSON) { _ = try e.uninstall() }
+  // Nothing may be deleted on failure: the original status line must still be recoverable.
+  #expect(FileManager.default.fileExists(atPath: e.wrapper))
+  #expect(
+    FileManager.default.fileExists(
+      atPath: e.state.appendingPathComponent("original-statusline.json").path))
+  #expect(
+    FileManager.default.fileExists(atPath: e.state.appendingPathComponent("settings.backup").path))
+  try good.write(to: e.settings)  // the user fixes the file
+  #expect(try e.uninstall() == .restored)
+  #expect(command(e.json()) == "echo hi")
+}
+
+@Test func symlinkedSettingsStaysASymlink() throws {
+  let e = Env()
+  defer { e.cleanup() }
+  let target = e.dir.appendingPathComponent("dotfiles/settings.json")
+  e.write(#"{"model":"opus"}"#, to: target)
+  try FileManager.default.createSymbolicLink(at: e.settings, withDestinationURL: target)
+  _ = try e.install()
+  let attrs = try FileManager.default.attributesOfItem(atPath: e.settings.path)
+  #expect(attrs[.type] as? FileAttributeType == .typeSymbolicLink)
+  #expect(command(e.json(target)) != nil)  // the real file got the change
+  #expect(try e.uninstall() == .restored)
+  let after = try FileManager.default.attributesOfItem(atPath: e.settings.path)
+  #expect(after[.type] as? FileAttributeType == .typeSymbolicLink)
+  #expect(String(decoding: e.read(target), as: UTF8.self) == #"{"model":"opus"}"#)
+}
+
+@Test func installRepairsAMissingWrapperScript() throws {
+  let e = Env()
+  defer { e.cleanup() }
+  _ = try e.install()
+  try FileManager.default.removeItem(atPath: e.wrapper)
+  #expect(try e.install() == .installed)  // not "already installed" while the script is gone
+  #expect(FileManager.default.isExecutableFile(atPath: e.wrapper))
+}
+
 // MARK: - The wrapper script itself
 
 private func runWrapper(_ e: Env, input: String) throws -> (out: String, code: Int32) {

@@ -145,3 +145,48 @@ private func status(
   m.ingest(status(five: 3, clock: c))
   #expect(r.lifted == [.fiveHour])
 }
+
+@Test func failureForcesTheWindowThatIsActuallyExhausted() {
+  let (m, c, r) = make()
+  m.ingest(status(five: 30, seven: 100, clock: c))  // weekly is the exhausted one
+  m.ingestRateLimitFailure(resetsAt: nil)
+  #expect(m.state(.sevenDay).status == .inLimit)
+  #expect(m.state(.fiveHour).status == .fresh)
+  m.ingest(status(five: 20, seven: 100, clock: c))  // 5h moves; weekly still exhausted
+  #expect(r.lifted.isEmpty)
+}
+
+@Test func failureWithNoDataFallsBackToFiveHourWindow() {
+  let (m, _, _) = make()
+  m.ingestRateLimitFailure(resetsAt: nil)
+  #expect(m.state(.fiveHour).status == .inLimit)
+  #expect(m.state(.sevenDay).status == .unknown)
+}
+
+@Test func forcedLimitWithoutResetTimeExpiresAfterTheFallbackWindow() {
+  let (m, c, r) = make()
+  m.ingestRateLimitFailure(resetsAt: nil)
+  c.advance(5 * 3600 - 1)
+  m.tick()
+  #expect(m.state(.fiveHour).status == .inLimit)
+  c.advance(2)
+  m.tick()
+  #expect(m.state(.fiveHour).status == .fresh)
+  #expect(r.lifted == [.fiveHour])
+}
+
+@Test func successfulWorkLiftsAForcedLimit() {
+  let (m, _, r) = make()
+  m.ingestRateLimitFailure(resetsAt: nil)
+  m.noteSuccessfulWork()
+  #expect(m.state(.fiveHour).status == .fresh)
+  #expect(r.lifted == [.fiveHour])
+}
+
+@Test func successfulWorkDoesNotTouchAPercentageBasedLimit() {
+  let (m, c, r) = make()
+  m.ingest(status(five: 100, clock: c))  // in limit because the usage says so
+  m.noteSuccessfulWork()
+  #expect(m.state(.fiveHour).status == .inLimit)
+  #expect(r.lifted.isEmpty)
+}
