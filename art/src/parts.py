@@ -75,6 +75,48 @@ def arm(side):
     return svg, grow(x, y, x + w, y + h, HALF)
 
 
+def arm_pose(side, pose, w=19):
+    """Rubber-hose arm pose: one cubic from ARM_TUCK inside the body (like the nub) to a round
+    hand. Same pivot (shoulder) as the nub and the same cel rule (shade shows along the bottom);
+    ink drawn under a masked fill. side = -1 left, +1 right (poses are drawn for the right arm)."""
+    *ctrl, hr = ARM_POSES[pose]
+    pts = [(x * side, y) for x, y in ctrl]
+    hx, hy = pts[-1]
+    d = "M{},{} C{},{} {},{} {},{}".format(*(v for p in pts for v in p))
+    mid = f"arm{'LR'[side > 0]}_{pose}"
+    stroke = lambda col, sw: (f'<path d="{d}" fill="none" stroke="{col}" stroke-width="{sw}" '
+                              f'stroke-linecap="round" stroke-linejoin="round"/>')
+    shape = lambda col, grow=0: (stroke(col, w + 2 * grow)
+                                 + f'<circle cx="{hx}" cy="{hy}" r="{hr + grow}" fill="{col}"/>')
+    svg = (f'<defs><mask id="{mid}" maskUnits="userSpaceOnUse" x="-200" y="-200" width="400" height="400">'
+           f'{shape("#fff")}</mask></defs>' + shape(C["outline"], HALF)
+           + f'<g mask="url(#{mid})">{shape(C["shade"])}<g transform="translate(0,-4)">{shape(C["base"])}</g></g>')
+    e = max(w / 2, hr) + HALF  # the curve stays inside its control hull
+    xs, ys = [x for x, _ in pts], [y for _, y in pts]
+    return svg, (min(xs) - e, min(ys) - e, max(xs) + e, max(ys) + e)
+
+
+# Arm poses for the right arm (y down, shoulder at 0,0): cubic p0, p1, p2, p3 (= hand), hand radius.
+ARM_POSES = {
+    "carry": ((-6, 0), (18, -2), (26, -30), (4, -50), 11),  # hands curl over the top corners
+    "up": ((-6, 2), (10, -4), (16, -34), (12, -66), 11),  # stretched high above the head
+    "type": ((-6, 0), (10, 1), (17, 10), (15, 24), 9),  # forward and down, little hands low
+    "shrug": ((-6, 0), (10, 2), (24, 2), (28, -12), 10),  # out and slightly up, palm-up flick
+}
+
+
+def eye_wide():
+    """Startled: the open eye grown 25%, with bigger catchlights (pupils 'lit up')."""
+    w, h = 21, 42
+    x, y = -w / 2, -h / 2
+    svg = (f'<defs>{CEL_EYE}</defs>'
+           f'<path d="{rr(x, y, w, h, 5.5)}" fill="url(#celEye)"/>'
+           f'<path d="{rr(x+2.4, y+3.4, 9, 13, 2)}" fill="#fff"/>'
+           f'<rect x="{x+12}" y="{y+27}" width="4.6" height="4.6" fill="#fff"/>'
+           f'<rect x="{x+13.5}" y="{y+4}" width="2.6" height="2.6" fill="#fff"/>')
+    return svg, (x, y, -x, -y)
+
+
 def leg_tuck():
     """Stubby folded leg: same hip pivot, about 9 pt visible below the hip."""
     x, y, w, h = -LEG_W / 2, -LEG_TUCK, LEG_W, LEG_TUCK + 9

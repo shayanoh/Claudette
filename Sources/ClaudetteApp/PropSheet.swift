@@ -54,7 +54,7 @@ extension PropSheet {
   /// Two overlapping Claudettes drawn like the overlay does (`ignoresSiblingOrder`): left with the
   /// same z (parts interleave), right with a z band each (the one in front is whole).
   static func renderOverlap(to url: URL) -> Bool {
-    let scene = SKScene(size: CGSize(width: 1040, height: 300))
+    let scene = SKScene(size: CGSize(width: 1340, height: 300))
     scene.anchorPoint = .zero
     scene.backgroundColor = NSColor(white: 0.9, alpha: 1)
     for (half, zs) in [(0, (0.0, 0.0)), (1, (200.0, 400.0))] {
@@ -81,6 +81,12 @@ extension PropSheet {
     sub.zPosition = 300
     sub.setAccent(hue: 0.3)
     scene.addChild(sub)
+    for (i, angle) in [0.0, -1.0].enumerated() {  // the trash can, lid closed and open
+      let can = TrashCanNode()
+      can.setLidAngle(CGFloat(angle))
+      can.position = CGPoint(x: 1090 + CGFloat(i) * 120, y: 50)
+      scene.addChild(can)
+    }
     let view = SKView(frame: CGRect(origin: .zero, size: scene.size))
     view.ignoresSiblingOrder = true
     view.presentScene(scene)

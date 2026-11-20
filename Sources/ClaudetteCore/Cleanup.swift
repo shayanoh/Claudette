@@ -17,8 +17,8 @@ public enum CleanupPlanner {
 
   public static func plan(
     items: [Item], actors: [String: CGPoint], can: CGPoint, now: Date
-  ) -> (assignments: [CleanupAssignment], duration: TimeInterval) {
-    guard !items.isEmpty, !actors.isEmpty else { return ([], 0) }
+  ) -> (assignments: [CleanupAssignment], duration: TimeInterval, natural: TimeInterval) {
+    guard !items.isEmpty, !actors.isEmpty else { return ([], 0, 0) }
     let names = actors.keys.sorted()
     func point(_ i: Item) -> CGPoint {
       guard let p = i.position, p.x.isFinite, p.y.isFinite else { return can }
@@ -69,7 +69,7 @@ public enum CleanupPlanner {
       result = build(perTrip: n)
     }
     let duration = min(durationRange.upperBound, max(durationRange.lowerBound, result.time))
-    return (result.assignments, duration)
+    return (result.assignments, duration, result.time)
   }
 }
 

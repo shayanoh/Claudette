@@ -23,6 +23,10 @@ final class Actor {
   var wandering = false
   var projectName = ""
   var nextRoam = Date.distantPast
+  /// Set while she is collecting items for the trash can.
+  var cleaning: CleanupRun?
+  /// What she carries to the can (up to three, stacked in front of her).
+  var armful: [ItemNode] = []
   /// The window she is sitting on and the spot on its top edge.
   var perch: (window: WindowFrame, spot: CGPoint)?
   /// What she is heading to or working on (lets a dragged item re-target her).
@@ -153,9 +157,7 @@ final class Stage {
     for change in changes {
       switch change {
       case .started(let id): addActor(id)
-      case .ended(let id):
-        removeActor(id)
-        world.sessionEnded(id)
+      case .ended(let id): endSession(id)
       case .phaseChanged(let id, let phase): phaseChanged(id, phase)
       case .subagentStarted(let id, let agent): addSub(id, agent)
       case .subagentStopped(let id, let agent): removeSub(id, agent)
@@ -209,10 +211,21 @@ final class Stage {
     a.puppet.wake()
   }
 
+  /// She tidies up what only her session used, then leaves.
+  private func endSession(_ id: String) {
+    guard let a = actors[id] else { return }
+    world.collectForLeaving(session: id, actor: a) { [weak self] in self?.removeActor(id) }
+  }
+
   private func removeActor(_ id: String) {
     guard let a = actors.removeValue(forKey: id) else { return }
     if dragging === a { dragging = nil }
     world.release(a)
+    for sub in a.subs.values {
+      world.release(sub)
+      sub.puppet.run(.sequence([.fadeOut(withDuration: 0.3), .removeFromParent()]))
+    }
+    a.subs.removeAll()
     a.puppet.sleep()
     a.puppet.run(
       .sequence([.wait(forDuration: 1.4), .fadeOut(withDuration: 0.5), .removeFromParent()]))
@@ -230,6 +243,7 @@ final class Stage {
     if case .error = a.lastPhase, !isError(phase) { a.puppet.relief() }
     a.lastPhase = phase
     a.puppet.setStatus(phase)
+    world.phaseChanged(session: id, phase: phase)
   }
 
   private func isError(_ phase: SessionPhase) -> Bool {
@@ -312,6 +326,18 @@ final class Stage {
     topZ += 200
     a.puppet.zPosition = topZ
     for sub in a.subs.values { sub.puppet.zPosition = topZ + 100 }
+  }
+
+  /// Keeps her feet at `p` inside a screen (a walk target near the edge must stay reachable).
+  func clampFeet(_ p: CGPoint, of a: Actor) -> CGPoint {
+    let k = scale * a.sizeFactor
+    let size = CGSize(
+      width: PuppetNode.hitBounds.width * k, height: PuppetNode.hitBounds.height * k)
+    let origin = CGPoint(
+      x: p.x + PuppetNode.hitBounds.minX * k, y: p.y + PuppetNode.hitBounds.minY * k)
+    let fitted = ScreenFit.clamp(origin, size: size, to: screenFrames)
+    return CGPoint(
+      x: fitted.x - PuppetNode.hitBounds.minX * k, y: fitted.y - PuppetNode.hitBounds.minY * k)
   }
 
   /// Every on-screen actor, sub-agents included.

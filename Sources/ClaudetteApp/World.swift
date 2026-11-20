@@ -5,11 +5,11 @@ import SpriteKit
 /// Everything lying around on the screen, shared by all Claudettes: owns the `WorldModel`, the item
 /// nodes and the execution of what the `Brain` plans (walking to items, working, tossing).
 final class World {
-  private unowned let stage: Stage
-  private(set) var model = WorldModel()
-  private var nodes: [ItemID: ItemNode] = [:]
+  unowned let stage: Stage
+  var model = WorldModel()
+  var nodes: [ItemID: ItemNode] = [:]
   private let brain = Brain()
-  private var rng = SystemRandomNumberGenerator()
+  var rng = SystemRandomNumberGenerator()
 
   init(stage: Stage) { self.stage = stage }
 
@@ -26,6 +26,12 @@ final class World {
       return
     }
     let (item, isNew, scene) = placed
+    if let run = actor.cleaning {
+      // A manual cleanup runs to completion (the new item just lies there afterwards); an automatic
+      // tidy-up gives way to real work.
+      if run.manual { return }
+      cancelCleanup(actor)
+    }
     let move = Brain.move(for: scene)
     let intents = brain.plan(
       event: .toolStarted(item, isNew: isNew, move: move), actor: brainActor(actor),
@@ -184,7 +190,7 @@ final class World {
   }
 
   /// Keeps `center` fully on a screen and works out the display and scene position.
-  private func settle(_ node: ItemNode, at center: CGPoint) -> (
+  func settle(_ node: ItemNode, at center: CGPoint) -> (
     center: CGPoint, scenePosition: CGPoint
   ) {
     let size = ItemNode.footprint
@@ -257,12 +263,6 @@ final class World {
     nodes[id]?.restyle(.shell(long: true, background: false), command: command)
   }
 
-  /// Interim until cleanup exists (phase 3): a finished session's sole-owner items fade away.
-  func sessionEnded(_ session: String) {
-    let ownerless = model.releaseSession(session)
-    ownerless.forEach { remove($0) }
-  }
-
   // MARK: Nodes
 
   private func makeNode(
@@ -282,7 +282,7 @@ final class World {
     node.popIn()
   }
 
-  private func remove(_ id: ItemID) {
+  func remove(_ id: ItemID) {
     model.remove([id])
     guard let node = nodes.removeValue(forKey: id) else { return }
     stage.draggables.removeAll { $0 === node }
@@ -335,7 +335,7 @@ final class World {
 
   // MARK: Executing intents
 
-  private func brainActor(_ a: Actor) -> BrainActor {
+  func brainActor(_ a: Actor) -> BrainActor {
     let sub = a.parent
     return BrainActor(
       position: stage.feet(of: a), holding: a.held?.itemID, isSubagent: sub != nil,
@@ -360,11 +360,13 @@ final class World {
       return
     }
     var steps: [SKAction] = []
+    var cursor = stage.feet(of: a)
     for intent in intents {
       switch intent {
       case .walk(let p):
         a.userPlaced = true
-        steps.append(walk(a, to: p))
+        steps.append(walk(a, from: cursor, to: p))
+        cursor = p
       case .play(let move):
         steps.append(.run { [weak a] in a?.puppet.perform(move) })
         steps.append(.wait(forDuration: 1.1))
@@ -388,8 +390,8 @@ final class World {
     stage.noteActivity()
   }
 
-  private func walk(_ a: Actor, to target: CGPoint) -> SKAction {
-    let start = stage.feet(of: a)
+  /// A walk from `start` (where the previous step leaves her, not where she stands now).
+  func walk(_ a: Actor, from start: CGPoint, to target: CGPoint) -> SKAction {
     let dist = hypot(target.x - start.x, target.y - start.y)
     guard dist > 1 else { return .wait(forDuration: 0) }
     let duration = stage.reduceMotion ? 0.05 : max(0.2, Double(dist) / (140 * Double(stage.scale)))

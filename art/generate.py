@@ -51,6 +51,10 @@ PARTS = {
     "jar_glass": (P.jar_glass, None, None, 1),
     "jar_fill": (P.jar_fill, "jar_glass", (0, 2), -1),  # behind the glass so sheen stays on top
     "jar_lid": (P.jar_lid, "jar_glass", (0, 33), 2),  # 1 pt overlap seats it on the rim
+    # Cleanup scene: the lid shares the can's canvas, so code places it at (0, 0) on the can and
+    # rotates it about R.TRASH_HINGE, (34, 77) y up from the anchor; open = clockwise, zRotation about -110 deg.
+    "trash_can": (R.trash_can, None, None, 0),
+    "trash_lid": (R.trash_lid, None, None, 1),
     "moon_dark": (P.moon_dark, None, None, 0),
     "moon_lit": (P.moon_lit, None, None, 1),
     "menubar": (P.menubar, None, None, 0),  # template image for the status item, not a rig part
@@ -72,7 +76,8 @@ PARTS = {
 }
 TINTED = {"scarf", "scarf_tail"}
 # Props whose anchor is [0.5, 0]: canvas bottom is the pivot, no margin below.
-FLUSH_BOTTOM = {"bag", "bag_fill", "jar_glass", "jar_fill", "jar_lid", "blanket", "blanket_deep", "night_patch"}
+FLUSH_BOTTOM = {"bag", "bag_fill", "jar_glass", "jar_fill", "jar_lid", "blanket", "blanket_deep", "night_patch",
+                "trash_can", "trash_lid"}
 
 # Texture variants "<base>.<variant>": same canvas and anchor as the base (the union of all).
 VARIANTS = {
@@ -84,6 +89,9 @@ VARIANTS = {
     "body.sleep_curl": ("body", P.body_sleep_curl),
     "body.sit": ("body", P.body_sit),
     **{f"leg_{i}.tuck": (f"leg_{i}", P.leg_tuck) for i in range(4)},
+    **{f"eye_{s}.wide": (f"eye_{s}", P.eye_wide) for s in "LR"},
+    **{f"arm_{s}.{v}": (f"arm_{s}", lambda k=k, v=v: P.arm_pose(k, v))
+       for s, k in (("L", -1), ("R", 1)) for v in P.ARM_POSES},
 }
 
 
@@ -294,7 +302,8 @@ TINTS = ["#7FC8F8", "#FFC94D", "#E5484D"]  # sample runtime tints for the cartri
 SCARF_TINTS = ["#7FC8F8", "#9BE38B", "#F29BC0", "#B9A6E8", "#FFC94D"]  # sample project hues
 LEVEL = {"bag_fill": 0.55, "jar_fill": 0.6}  # sheet preview of the fill levels
 CHARACTER = [n for n in PARTS if n not in ("jar_glass", "jar_fill", "jar_lid", "moon_dark", "moon_lit", "menubar",
-                                             "blanket", "blanket_deep", "night_patch", "scarf", "scarf_tail")
+                                             "blanket", "blanket_deep", "night_patch", "scarf", "scarf_tail",
+                                             "trash_can", "trash_lid")
              and not n.startswith("outfit_")]
 POSES = [  # (hidden parts, swaps)
     ({"mouth", "bag", "bag_fill"}, {}),

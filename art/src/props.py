@@ -5,7 +5,7 @@ Same contract as parts.py: points, y DOWN, pivot at (0, 0); each function return
 """
 import math
 
-from parts import C, rr
+from parts import C, INK as BODY_INK, rr  # BODY_INK: rig-scale props (jar, bag, bin)
 
 INK = 3.0  # prop ink: bold but lighter than her 4.6 body line
 H = INK / 2
@@ -296,3 +296,49 @@ def prop_mcp_cable():
     pins = "".join(f'<rect x="{H+11.5}" y="{y}" width="4.5" height="2" rx="0.5" fill="{METAL}" '
                    f'stroke="{INK_C}" stroke-width="1"/>' for y in (-3.6, 1.6))
     return body + pins, (0, -7, H + 16.5, 7)
+
+
+# ---------------------------------------------------------------- cleanup scene
+# Pivot = bottom centre of the base (anchor [0.5, 0]). Can and lid share one canvas so the lid
+# sits on the can at (0, 0); the lid swings about TRASH_HINGE (y down here, so y up = (34, 77)).
+TRASH_HINGE = (34, -77)
+TRASH_BOX = (-42, -96, 42, 0)  # union of can and lid, both report it so the canvases match
+TIN, TIN_D, TIN_L, HOLE = "#C9C9D1", "#9A9AA6", "#E4E4EA", "#2B2530"
+
+
+def trash_can():
+    """Slightly dented metal bin, open on top: tapered body with two rings, a dent on the right,
+    rolled rim around a dark opening and the hinge knuckle at the back right of the rim."""
+    d = ("M-33,-72 H33 L31.6,-46 Q27.6,-39 30.6,-31 L29,-6 Q28.6,0 22.6,0 "
+         "H-22.6 Q-28.6,0 -29,-6 Z")
+    rings = "".join(f'<path d="M-36,{y} H36" stroke="{INK_C}" stroke-width="2"/>'
+                    f'<path d="M-36,{y+2.2} H36" stroke="{TIN_L}" stroke-width="1.6"/>' for y in (-52, -20))
+    inner = (rings + gloss(-27, -66, 4, 18, 0.7) + gloss(-27, -44, 4, 12, 0.55)
+             + f'<path d="M26.4,-44 Q23.4,-38.5 26,-32" stroke="{TIN_D}" stroke-width="3" fill="none" '
+               f'stroke-linecap="round"/>'
+             + f'<path d="M24.6,-43 Q21.8,-38.5 24.2,-33.5" stroke="{TIN_L}" stroke-width="1.4" fill="none" '
+               f'stroke-linecap="round"/>')
+    body = cel(d, TIN, TIN_D, off=(-5, -3), inner=inner, ink=BODY_INK)
+    rim_d = rr(-37, -79, 74, 9, 4.5)
+    rim = cel(rim_d, TIN_L, TIN, off=(-2, -2), ink=INK)
+    hole = (f'<ellipse cx="0" cy="-76.5" rx="31" ry="3.6" fill="{HOLE}"/>'
+            f'<path d="M-29,-75.6 Q0,-72.8 29,-75.6" stroke="#4A4250" stroke-width="1.4" fill="none"/>')
+    hx, hy = TRASH_HINGE
+    knuckle = f'<path d="{rr(hx-3, hy-4.5, 7, 9, 2.5)}" fill="{TIN_D}" stroke="{INK_C}" stroke-width="2"/>'
+    return body + rim + hole + knuckle, TRASH_BOX
+
+
+def trash_lid():
+    """Domed lid with a loop handle; closed it covers the opening, its hinge leaf over the knuckle.
+    Reads swung open too: the underside rim shows as the dark band along its bottom edge."""
+    d = "M-38,-76 Q-38,-82 -31,-83.5 Q0,-91 31,-83.5 Q38,-82 38,-76 Q38,-73 35,-73 H-35 Q-38,-73 -38,-76 Z"
+    inner = (f'<path d="M-38,-75.6 H38 V-72 H-38 Z" fill="{TIN_D}"/>'
+             + gloss(-28, -84.5, 20, 2.4, 0.8))
+    lid = cel(d, TIN, TIN_D, off=(-4, -2.5), inner=inner, ink=BODY_INK)
+    handle = (f'<path d="M-9,-87.6 V-91 Q-9,-94 -6,-94 H6 Q9,-94 9,-91 V-87.6" fill="none" '
+              f'stroke="{INK_C}" stroke-width="{BODY_INK + 3.4}" stroke-linejoin="round" stroke-linecap="round"/>'
+              f'<path d="M-9,-87.6 V-91 Q-9,-94 -6,-94 H6 Q9,-94 9,-91 V-87.6" fill="none" '
+              f'stroke="{TIN_D}" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>')
+    hx, hy = TRASH_HINGE
+    leaf = f'<path d="{rr(hx-5, hy-2.5, 9, 5, 2)}" fill="{TIN_D}" stroke="{INK_C}" stroke-width="2"/>'
+    return handle + lid + leaf, TRASH_BOX

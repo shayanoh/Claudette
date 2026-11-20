@@ -131,3 +131,12 @@ private func owned(_ n: Int) -> [Item] { (0..<n).map { item($0, age: Double($0))
   let ids = ClutterPolicy.sessionEnd(session: "s1", items: [mine, shared, theirs])
   #expect(ids == [mine.id])
 }
+
+@Test func theUnscaledTimeIsReportedSoTheSceneCanSpeedUpOrDawdle() {
+  let plan = CleanupPlanner.plan(
+    items: many(200), actors: ["a": CGPoint(x: 600, y: 100)], can: can, now: t0)
+  #expect(plan.natural > plan.duration)  // far too much work for 30 s: she must hurry
+  let one = CleanupPlanner.plan(
+    items: [item(1)], actors: ["a": CGPoint(x: 600, y: 100)], can: can, now: t0)
+  #expect(one.natural < one.duration)  // a single item: she dawdles to fill the 10 s
+}

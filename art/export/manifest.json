@@ -2,8 +2,8 @@
   "assets": {
     "arm_L": {
       "anchor": [
-        0.714286,
-        0.5
+        0.666667,
+        0.313559
       ],
       "file": "arm_L.png",
       "parent": "bodyPivot",
@@ -12,15 +12,63 @@
         52
       ],
       "size": [
-        35,
-        30
+        63,
+        118
       ],
       "z": 0
     },
+    "arm_L.carry": {
+      "anchor": [
+        0.666667,
+        0.313559
+      ],
+      "file": "arm_L_carry.png",
+      "size": [
+        63,
+        118
+      ],
+      "variantOf": "arm_L"
+    },
+    "arm_L.shrug": {
+      "anchor": [
+        0.666667,
+        0.313559
+      ],
+      "file": "arm_L_shrug.png",
+      "size": [
+        63,
+        118
+      ],
+      "variantOf": "arm_L"
+    },
+    "arm_L.type": {
+      "anchor": [
+        0.666667,
+        0.313559
+      ],
+      "file": "arm_L_type.png",
+      "size": [
+        63,
+        118
+      ],
+      "variantOf": "arm_L"
+    },
+    "arm_L.up": {
+      "anchor": [
+        0.666667,
+        0.313559
+      ],
+      "file": "arm_L_up.png",
+      "size": [
+        63,
+        118
+      ],
+      "variantOf": "arm_L"
+    },
     "arm_R": {
       "anchor": [
-        0.285714,
-        0.5
+        0.333333,
+        0.313559
       ],
       "file": "arm_R.png",
       "parent": "bodyPivot",
@@ -29,10 +77,58 @@
         52
       ],
       "size": [
-        35,
-        30
+        63,
+        118
       ],
       "z": 0
+    },
+    "arm_R.carry": {
+      "anchor": [
+        0.333333,
+        0.313559
+      ],
+      "file": "arm_R_carry.png",
+      "size": [
+        63,
+        118
+      ],
+      "variantOf": "arm_R"
+    },
+    "arm_R.shrug": {
+      "anchor": [
+        0.333333,
+        0.313559
+      ],
+      "file": "arm_R_shrug.png",
+      "size": [
+        63,
+        118
+      ],
+      "variantOf": "arm_R"
+    },
+    "arm_R.type": {
+      "anchor": [
+        0.333333,
+        0.313559
+      ],
+      "file": "arm_R_type.png",
+      "size": [
+        63,
+        118
+      ],
+      "variantOf": "arm_R"
+    },
+    "arm_R.up": {
+      "anchor": [
+        0.333333,
+        0.313559
+      ],
+      "file": "arm_R_up.png",
+      "size": [
+        63,
+        118
+      ],
+      "variantOf": "arm_R"
     },
     "bag": {
       "anchor": [
@@ -190,7 +286,7 @@
       ],
       "size": [
         26,
-        36
+        44
       ],
       "z": 1
     },
@@ -202,7 +298,7 @@
       "file": "eye_L_focus.png",
       "size": [
         26,
-        36
+        44
       ],
       "variantOf": "eye_L"
     },
@@ -214,7 +310,7 @@
       "file": "eye_L_half.png",
       "size": [
         26,
-        36
+        44
       ],
       "variantOf": "eye_L"
     },
@@ -226,7 +322,7 @@
       "file": "eye_L_happy.png",
       "size": [
         26,
-        36
+        44
       ],
       "variantOf": "eye_L"
     },
@@ -238,7 +334,19 @@
       "file": "eye_L_sleep.png",
       "size": [
         26,
-        36
+        44
+      ],
+      "variantOf": "eye_L"
+    },
+    "eye_L.wide": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_L_wide.png",
+      "size": [
+        26,
+        44
       ],
       "variantOf": "eye_L"
     },
@@ -255,7 +363,7 @@
       ],
       "size": [
         26,
-        36
+        44
       ],
       "z": 1
     },
@@ -267,7 +375,7 @@
       "file": "eye_R_focus.png",
       "size": [
         26,
-        36
+        44
       ],
       "variantOf": "eye_R"
     },
@@ -279,7 +387,7 @@
       "file": "eye_R_half.png",
       "size": [
         26,
-        36
+        44
       ],
       "variantOf": "eye_R"
     },
@@ -291,7 +399,7 @@
       "file": "eye_R_happy.png",
       "size": [
         26,
-        36
+        44
       ],
       "variantOf": "eye_R"
     },
@@ -303,7 +411,19 @@
       "file": "eye_R_sleep.png",
       "size": [
         26,
-        36
+        44
+      ],
+      "variantOf": "eye_R"
+    },
+    "eye_R.wide": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_R_wide.png",
+      "size": [
+        26,
+        44
       ],
       "variantOf": "eye_R"
     },
@@ -1204,6 +1324,30 @@
         46,
         30
       ]
+    },
+    "trash_can": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "trash_can.png",
+      "size": [
+        86,
+        97
+      ],
+      "z": 0
+    },
+    "trash_lid": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "trash_lid.png",
+      "size": [
+        86,
+        97
+      ],
+      "z": 1
     }
   },
   "scale": 2,

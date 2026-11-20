@@ -58,6 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       menu.addItem(item)
     }
     menu.addItem(.separator())
+    let cleanup = NSMenuItem(title: "Clean up", action: #selector(cleanUp), keyEquivalent: "")
+    menu.addItem(cleanup)
     let focus = NSMenuItem(title: "Focus mode", action: #selector(toggleFocus), keyEquivalent: "")
     focus.target = self
     focus.state = model.settings.settings.focusMode ? .on : .off
@@ -167,6 +169,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         model.stage.world.debugClutter(n)
       }
     }
+    if env["CLAUDETTE_DEBUG_CLEANUP"] != nil {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [model] in
+        model.stage.world.cleanUpAll()
+      }
+    }
     if env["CLAUDETTE_DEBUG_MOONDRAG"] != nil {
       DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [model] in
         let f = NSScreen.main?.frame ?? .zero
@@ -194,6 +201,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.openSettings() }
     }
   }
+
+  @objc private func cleanUp() { model.stage.world.cleanUpAll() }
 
   @objc private func simulateScene(_ sender: NSMenuItem) { model.simulateScene(sender.title) }
 
