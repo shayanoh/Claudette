@@ -152,6 +152,12 @@ final class World {
 
   // MARK: Carrying
 
+  /// Carrying arms while she holds anything, resting arms otherwise.
+  func updateArms(_ a: Actor) {
+    a.puppet.carrying = a.held != nil || !a.armful.isEmpty
+    a.puppet.restoreArms()
+  }
+
   /// She takes the item into her hands (it rides along if she dodges) until she tosses or sets it down.
   private func pickUp(_ a: Actor, _ id: ItemID) {
     guard a.held == nil, let node = nodes[id] else { return }
@@ -164,12 +170,14 @@ final class World {
     node.zPosition = 6
     a.puppet.addChild(node)
     a.held = node
+    updateArms(a)
   }
 
   /// Puts what she holds on the screen at `point` (global), or beside her feet.
   func putDownHeld(_ a: Actor, at point: CGPoint? = nil) {
     guard let node = a.held else { return }
     a.held = nil
+    updateArms(a)
     let feet = stage.feet(of: a)
     let spot = point ?? CGPoint(x: feet.x - 130 * stage.scale, y: feet.y + 20)
     node.removeFromParent()
@@ -416,6 +424,8 @@ final class World {
     {
       let from = parent.convert(node.position, to: scene)
       holder.held = nil
+      updateArms(holder)
+      holder.puppet.tossGesture()
       node.removeFromParent()
       node.setHeld(false)
       node.zPosition = 0

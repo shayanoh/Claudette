@@ -32,7 +32,8 @@ extension PuppetNode {
   }
 }
 
-enum EyeVariant: String { case open, happy, sleep, focus, half }
+enum EyeVariant: String { case open, happy, sleep, focus, half, wide }
+enum ArmPose: String { case carry, up, type, shrug }
 enum MouthVariant: String { case smile, blep, o, wobble }
 enum BodyPose: String {
   case stand, sit
@@ -262,28 +263,114 @@ extension PuppetNode {
     }
   }
 
-  /// A short at-work beat for a tool call: focused eyes and a little bob, then back to normal.
-  func perform(_ move: Move) {
-    switch move {
-    case .read, .typing, .search:
-      setEyes(.focus)
-      bodyPivot.run(
-        .repeat(
-          .sequence([.moveBy(x: 0, y: -3, duration: 0.12), .moveBy(x: 0, y: 3, duration: 0.12)]),
-          count: 4), withKey: "work")
-      run(
-        .sequence([.wait(forDuration: 1.0), .run { [weak self] in self?.setEyes(.open) }]),
-        withKey: "workFace")
-    case .shrug:
-      run(
-        .sequence([
-          .rotate(toAngle: 0.1, duration: 0.12), .rotate(toAngle: -0.1, duration: 0.12),
-          .rotate(toAngle: 0, duration: 0.1),
-        ]), withKey: "shrug")
-    case .celebrate: happy()
-    case .startled: hop()
-    case .think, .yawn, .stretch, .trip: break  // later tasks give these their own animation
+  /// Arm texture for what she is doing; nil is the resting arms.
+  func setArms(_ p: ArmPose?) {
+    guard usesArt else { return }
+    for (node, base) in zip(arms, ["arm_L", "arm_R"]) {
+      swap(node, base: base, variant: p?.rawValue)
     }
+  }
+
+  /// Back to the arms she should have now: raised when she is carrying something.
+  func restoreArms() { setArms(carrying ? .carry : nil) }
+
+  /// A quick flick of both arms as she throws something.
+  func tossGesture() {
+    setArms(.up)
+    run(
+      .sequence([.wait(forDuration: 0.3), .run { [weak self] in self?.restoreArms() }]),
+      withKey: "tossArms")
+  }
+
+  /// The animation set: one beat per `Move`. Everything is a texture swap plus small motions; with
+  /// Reduce Motion only the textures change.
+  func perform(_ move: Move) {
+    guard !isAsleepNow else { return }
+    removeAction(forKey: "perform")
+    let calm = reduceMotion
+    func bob(_ dy: CGFloat, _ t: Double, times: Int) -> SKAction {
+      .repeat(
+        .sequence([.moveBy(x: 0, y: dy, duration: t), .moveBy(x: 0, y: -dy, duration: t)]),
+        count: times)
+    }
+    var hold = 1.0
+    switch move {
+    case .read:
+      setEyes(.focus)
+      if !calm {
+        face.run(
+          .repeat(
+            .sequence([
+              .moveBy(x: -5, y: 0, duration: 0.15), .moveBy(x: 10, y: 0, duration: 0.3),
+              .moveBy(x: -5, y: 0, duration: 0.15),
+            ]), count: 2), withKey: "scan")
+      }
+    case .typing:
+      setArms(.type)
+      setEyes(.focus)
+      if !calm { bodyPivot.run(bob(-3, 0.07, times: 6), withKey: "work") }
+    case .search:
+      setEyes(.focus)
+      if !calm {
+        hop()
+        run(
+          .sequence([.wait(forDuration: 0.45), .run { [weak self] in self?.hop() }]),
+          withKey: "hop2")
+      }
+      hold = 1.0
+    case .shrug:
+      setArms(.shrug)
+      if !calm {
+        run(
+          .sequence([
+            .rotate(toAngle: 0.1, duration: 0.15), .rotate(toAngle: -0.1, duration: 0.2),
+            .rotate(toAngle: 0, duration: 0.12),
+          ]), withKey: "shrug")
+      }
+      hold = 0.9
+    case .celebrate:
+      setArms(.up)
+      if calm { setEyes(.happy) } else { happy() }
+      hold = 1.3
+    case .startled:
+      setEyes(.wide)
+      setMouth(.o)
+      if !calm { hop() }
+      hold = 0.8
+    case .trip:
+      setEyes(.wide)
+      hold = 0.9
+    case .yawn:
+      setEyes(.half)
+      setMouth(.o)
+      if !calm {
+        bodyPivot.run(
+          .sequence([.scaleY(to: 1.07, duration: 0.7), .scaleY(to: 1, duration: 0.5)]),
+          withKey: "yawn")
+      }
+      hold = 1.3
+    case .stretch:
+      setArms(.up)
+      if !calm {
+        bodyPivot.run(
+          .sequence([
+            .scaleY(to: 1.1, duration: 0.35), .wait(forDuration: 0.4),
+            .scaleY(to: 1, duration: 0.3),
+          ]), withKey: "stretch")
+      }
+      hold = 1.1
+    case .think: return  // the bubble and the pacing are `think(_:)`
+    }
+    run(
+      .sequence([
+        .wait(forDuration: hold),
+        .run { [weak self] in
+          guard let self, !self.isAsleepNow else { return }
+          self.setEyes(.open)
+          self.setMouth(nil)
+          self.restoreArms()
+        },
+      ]), withKey: "perform")
   }
 }
 

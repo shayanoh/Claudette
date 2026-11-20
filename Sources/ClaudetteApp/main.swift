@@ -52,6 +52,11 @@ if let i = args.firstIndex(of: "--render-overlap"), i + 1 < args.count {
   exit(PropSheet.renderOverlap(to: URL(fileURLWithPath: args[i + 1])) ? 0 : 1)
 }
 
+if let i = args.firstIndex(of: "--render-poses"), i + 1 < args.count {
+  _ = NSApplication.shared
+  exit(PropSheet.renderPoses(to: URL(fileURLWithPath: args[i + 1])) ? 0 : 1)
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

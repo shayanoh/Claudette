@@ -233,7 +233,7 @@ extension World {
     node.zPosition = 6 + i
     a.puppet.addChild(node)
     a.armful.append(node)
-    a.puppet.perform(.read)
+    updateArms(a)
   }
 
   /// Takes an item out of her arms, into the scene at its current screen position.
@@ -243,6 +243,7 @@ extension World {
     }
     let from = parent.convert(node.position, to: scene)
     a.armful.removeAll { $0 === node }
+    updateArms(a)
     node.removeFromParent()
     node.setHeld(false)
     node.position = from
@@ -272,7 +273,7 @@ extension World {
   private func stumble(_ a: Actor, dropping id: ItemID, at spot: CGPoint) {
     guard let node = a.armful.first(where: { $0.itemID == id }), detach(node, from: a) != nil
     else { return }
-    a.puppet.perform(.startled)
+    a.puppet.perform(.trip)
     a.puppet.run(
       .sequence([
         .rotate(toAngle: 0.18, duration: 0.1), .rotate(toAngle: -0.12, duration: 0.12),
@@ -331,6 +332,7 @@ extension World {
     trace("done: \(a.sessionID), \(run.remaining) crew left")
     a.cleaning = nil
     a.armful.removeAll()
+    updateArms(a)
     run.remaining -= 1
     if run.remaining <= 0 { finish(run) }
   }
@@ -354,6 +356,7 @@ extension World {
       node.pop()
     }
     a.armful.removeAll()
+    updateArms(a)
     a.cleaning = nil
     run.remaining -= 1
     if run.remaining <= 0 { finish(run) }

@@ -38,8 +38,11 @@ public struct ToolResult: Equatable, Sendable {
   public var success: Bool
   public var durationMs: Int?
   public var summary: String?
+  /// The user stopped it (Esc): Claudette is startled, then shrugs.
+  public var interrupted = false
 
-  public init(success: Bool, durationMs: Int?, summary: String?) {
+  public init(success: Bool, durationMs: Int?, summary: String?, interrupted: Bool = false) {
+    self.interrupted = interrupted
     self.success = success
     self.durationMs = durationMs
     self.summary = summary
@@ -65,7 +68,11 @@ public struct ToolResult: Equatable, Sendable {
     let duration = e.raw["duration_ms"]?.doubleValue.flatMap {
       $0.isFinite ? Int(max(0, min($0, 1e9))) : nil
     }
-    return ToolResult(success: success, durationMs: duration, summary: summary)
+    let stopped =
+      e.raw["is_interrupt"]?.boolValue == true
+      || e.raw["tool_response"]?["interrupted"]?.boolValue == true
+    return ToolResult(
+      success: success, durationMs: duration, summary: summary, interrupted: stopped)
   }
 }
 

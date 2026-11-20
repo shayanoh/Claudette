@@ -96,3 +96,47 @@ extension PropSheet {
     return (try? png.write(to: url)) != nil
   }
 }
+
+extension PropSheet {
+  /// One Claudette per animation beat, frozen right after it starts (arm and eye variants show).
+  static func renderPoses(to url: URL) -> Bool {
+    let beats: [(String, (PuppetNode) -> Void)] = [
+      (
+        "carry",
+        {
+          $0.carrying = true
+          $0.restoreArms()
+        }
+      ),
+      ("typing", { $0.perform(.typing) }),
+      ("read", { $0.perform(.read) }),
+      ("shrug", { $0.perform(.shrug) }),
+      ("celebrate", { $0.perform(.celebrate) }),
+      ("startled", { $0.perform(.startled) }),
+      ("yawn", { $0.perform(.yawn) }),
+      ("stretch", { $0.perform(.stretch) }),
+    ]
+    let scene = SKScene(size: CGSize(width: 260 * CGFloat(beats.count), height: 330))
+    scene.anchorPoint = .zero
+    scene.backgroundColor = NSColor(white: 0.9, alpha: 1)
+    for (i, beat) in beats.enumerated() {
+      let puppet = PuppetNode()
+      puppet.reduceMotion = true  // textures only: nothing is mid-motion in a still
+      puppet.setScale(0.8)
+      puppet.position = CGPoint(x: 130 + 260 * CGFloat(i), y: 40)
+      scene.addChild(puppet)
+      beat.1(puppet)
+      guard let tag = LabelTexture.entry(beat.0, size: 14) else { continue }
+      let label = SKSpriteNode(texture: tag.texture, size: tag.size)
+      label.colorBlendFactor = 1
+      label.position = CGPoint(x: 130 + 260 * CGFloat(i), y: 300)
+      scene.addChild(label)
+    }
+    let view = SKView(frame: CGRect(origin: .zero, size: scene.size))
+    view.presentScene(scene)
+    guard let texture = view.texture(from: scene) else { return false }
+    let rep = NSBitmapImageRep(cgImage: texture.cgImage())
+    guard let png = rep.representation(using: .png, properties: [:]) else { return false }
+    return (try? png.write(to: url)) != nil
+  }
+}

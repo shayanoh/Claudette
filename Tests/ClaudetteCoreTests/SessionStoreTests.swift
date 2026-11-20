@@ -398,3 +398,18 @@ private func result(_ changes: [SessionChange]) -> ToolResult? {
   }
   #expect(tool2.agentID == nil)
 }
+
+@Test func anInterruptedToolIsFlaggedInItsResult() {
+  let (s, _) = make()
+  _ = s.apply(ev("PreToolUse", tool: "Bash", id: "b1"))
+  let changes = s.apply(
+    ev("PostToolUseFailure", tool: "Bash", id: "b1", extra: #""is_interrupt":true,"error":"x""#))
+  #expect(result(changes)?.interrupted == true)
+  _ = s.apply(ev("PreToolUse", tool: "Bash", id: "b2"))
+  let plain = s.apply(ev("PostToolUseFailure", tool: "Bash", id: "b2", extra: #""error":"boom""#))
+  #expect(result(plain)?.interrupted == false)
+  _ = s.apply(ev("PreToolUse", tool: "Bash", id: "b3"))
+  let viaResponse = s.apply(
+    ev("PostToolUse", tool: "Bash", id: "b3", extra: #""tool_response":{"interrupted":true}"#))
+  #expect(result(viaResponse)?.interrupted == true)
+}

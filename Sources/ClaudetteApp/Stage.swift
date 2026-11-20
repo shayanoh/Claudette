@@ -165,8 +165,9 @@ final class Stage {
       case .toolStarted(let id, let tool):
         world.toolStarted(session: id, tool: tool, cwd: sessions[id]?.cwd)
       case .toolFinished(let id, _, let ok): if !ok { shake(id) }
-      case .toolResult(_, let toolID, let result):
+      case .toolResult(let id, let toolID, let result):
         world.toolResult(toolUseID: toolID, result: result)
+        if result.interrupted { interrupted(id) }
       case .longShell(_, let toolID): world.longShell(toolUseID: toolID)
       case .skillLoaded(let id, let name):
         actors[id]?.puppet.rune(settings.settings.privacyMode ? "•••" : name)
@@ -206,6 +207,7 @@ final class Stage {
     actors[id] = a
     a.puppet.setScale(scale)
     a.puppet.name = "puppet-\(id)"
+    a.puppet.reduceMotion = reduceMotion
     bringToFront(a)
     relayout()
     a.puppet.wake()
@@ -241,6 +243,7 @@ final class Stage {
       a.puppet.idle()
     }
     if case .error = a.lastPhase, !isError(phase) { a.puppet.relief() }
+    if a.lastPhase == .working, phase == .idle { a.puppet.perform(.celebrate) }  // turn finished
     a.lastPhase = phase
     a.puppet.setStatus(phase)
     world.phaseChanged(session: id, phase: phase)
@@ -249,6 +252,15 @@ final class Stage {
   private func isError(_ phase: SessionPhase) -> Bool {
     if case .error = phase { return true }
     return false
+  }
+
+  /// Esc: startled, then a shrug.
+  private func interrupted(_ id: String) {
+    guard let p = actors[id]?.puppet else { return }
+    p.perform(.startled)
+    p.run(
+      .sequence([.wait(forDuration: 0.9), .run { [weak p] in p?.perform(.shrug) }]),
+      withKey: "interrupted")
   }
 
   /// A failed tool call makes her flinch sideways.
@@ -292,6 +304,7 @@ final class Stage {
     sub.parent = parent
     sub.puppet.setScale(scale * sub.sizeFactor)
     sub.puppet.name = "puppet-\(id)/\(agent)"
+    sub.puppet.reduceMotion = reduceMotion
     // Beside her, on the roomier side of the screen, and always fully on screen.
     let feet = feet(of: parent)
     let frame = screen(parent.display)?.frame ?? .zero
@@ -348,7 +361,10 @@ final class Stage {
   // MARK: - Layout
 
   func settingsChanged() {
-    for a in allActors { a.puppet.setScale(scale * a.sizeFactor) }
+    for a in allActors {
+      a.puppet.setScale(scale * a.sizeFactor)
+      a.puppet.reduceMotion = reduceMotion
+    }
     world.applyScale()
     overlay.focusHidden = settings.settings.focusMode
     relayout()

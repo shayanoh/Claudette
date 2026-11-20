@@ -45,6 +45,11 @@ final class PuppetNode: SKNode {
   var outfit: ModelFamily = .other
   var accentHue: Double?
   private var asleep = false
+  var isAsleepNow: Bool { asleep }
+  /// She holds items: the carrying arms are her resting arms. Set by the world.
+  var carrying = false
+  /// Animations drop their motion (textures still change). Set by the stage.
+  var reduceMotion = false
 
   override init() {
     super.init()
@@ -249,7 +254,18 @@ final class PuppetNode: SKNode {
     ) { [weak self] in
       // A limit sleep scene applied while she was waking up must not be undone by the wake-up.
       guard let self, self.sleepDepth == .awake else { return }
-      self.idle()
+      // Wakes with a yawn and a stretch, then settles.
+      self.setMouth(nil)
+      self.perform(.yawn)
+      self.run(
+        .sequence([
+          .wait(forDuration: 1.4), .run { [weak self] in self?.perform(.stretch) },
+          .wait(forDuration: 1.2),
+          .run { [weak self] in
+            guard let self, self.sleepDepth == .awake else { return }
+            self.idle()
+          },
+        ]), withKey: "wakeUp")
     }
   }
 
