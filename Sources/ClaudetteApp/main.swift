@@ -57,6 +57,24 @@ if let i = args.firstIndex(of: "--render-poses"), i + 1 < args.count {
   exit(PropSheet.renderPoses(to: URL(fileURLWithPath: args[i + 1])) ? 0 : 1)
 }
 
+if let i = args.firstIndex(of: "--render-hover"), i + 1 < args.count {
+  _ = NSApplication.shared
+  exit(PropSheet.renderHover(to: URL(fileURLWithPath: args[i + 1])) ? 0 : 1)
+}
+
+// Developer helper: `Claudette --print-walk-area` prints each screen, its visible frame and the area
+// Claudettes and items may use (Dock and magnification reserved), then exits.
+if args.contains("--print-walk-area") {
+  _ = NSApplication.shared
+  print("dock magnified extra: \(DockInfo.magnifiedExtra)")
+  for s in NSScreen.screens {
+    let walk = WalkArea.frame(
+      screen: s.frame, visible: s.visibleFrame, magnifiedExtra: DockInfo.magnifiedExtra)
+    print("screen \(s.frame)  visible \(s.visibleFrame)  walk \(walk)")
+  }
+  exit(0)
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

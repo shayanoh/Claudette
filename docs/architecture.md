@@ -110,6 +110,8 @@ PNG's pixel size). The PNGs and manifest are committed, so building the app need
 | `Claudette --render-props <png>` | draws every prop kind on a light and a dark backdrop (label legibility), then exits |
 | `CLAUDETTE_DEBUG_CLUTTER=N` | (with `CLAUDETTE_DEBUG_SPAWN=1`) leaves N files and terminals around the first Claudette |
 | `Claudette --render-overlap <png>` | two overlapping Claudettes (same z vs a band each), a thought bubble and a sub-agent |
+| `Claudette --print-walk-area` | prints each screen, its visible frame and the walk area (Dock and magnification reserved) |
+| `Claudette --render-hover <png>` | a terminal item with its wrapped hover text and its detail window content |
 | `CLAUDETTE_DEBUG_DRAGTEST=1` | drags the first character across the screen using the real code path |
 | `CLAUDETTE_LOG_EVENTS=1` | logs raw payloads to `~/Library/Logs/Claudette/events.jsonl` (off by default: prompts) |
 | `CLAUDETTE_HOME=dir` | redirects every `~/.claude` and Application Support path (sandbox for testing) |

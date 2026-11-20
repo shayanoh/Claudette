@@ -111,7 +111,8 @@ extension World {
       Dictionary(grouping: items.filter { live.contains($0.display ?? 0) }, by: { $0.display ?? 0 })
       .max { $0.value.count < $1.value.count }?.key
       ?? (live.contains(crew[0].display) ? crew[0].display : live.first ?? crew[0].display)
-    let frame = stage.screen(display)?.visibleFrame ?? stage.screenFrames.first ?? .zero
+    let frame =
+      stage.screen(display).map { stage.walkFrame(for: $0) } ?? stage.screenFrames.first ?? .zero
     let meanX = items.compactMap(\.position).map(\.x).reduce(0, +) / CGFloat(max(1, items.count))
     let right = meanX > frame.midX
     let k = stage.scale
@@ -141,11 +142,16 @@ extension World {
     trace(
       "plan: duration \(plan.duration) natural \(plan.natural), \(plan.assignments.count) assignments"
     )
-    for assignment in plan.assignments {
+    for (index, assignment) in plan.assignments.enumerated() {
       guard let a = byKey[assignment.actor] else { continue }
+      // Everybody ends up at the can: each stands a little further along, so they read as separate.
+      let toward: CGFloat = canStand.x < canBase.x ? -1 : 1
+      let myCan = CGPoint(
+        x: canStand.x + toward * CGFloat(index) * 90 * k,
+        y: canStand.y + (index % 2 == 1 ? 18 * k : 0))
       a.cleaning = run
       run.remaining += 1
-      var list = steps(for: a, trips: assignment.trips, run: run, canStand: canStand)
+      var list = steps(for: a, trips: assignment.trips, run: run, canStand: myCan)
       let actual = SKAction.sequence(list).duration
       trace(
         "actor \(a.sessionID): \(assignment.trips.flatMap { $0 }.count) items, built \(actual) s")

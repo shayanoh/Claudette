@@ -1,6 +1,7 @@
 import AppKit
 import ClaudetteCore
 import SpriteKit
+import SwiftUI
 
 /// `--render-props`: every prop kind on a light and a dark backdrop, to judge label legibility
 /// without arranging a live scene.
@@ -136,6 +137,70 @@ extension PropSheet {
     guard let texture = view.texture(from: scene) else { return false }
     let rep = NSBitmapImageRep(cgImage: texture.cgImage())
     guard let png = rep.representation(using: .png, properties: [:]) else { return false }
+    return (try? png.write(to: url)) != nil
+  }
+}
+
+extension PropSheet {
+  private static func sampleItem() -> Item {
+    var w = WorldModel()
+    let command =
+      "swift build --configuration release --product Claudette && codesign --force --sign - --deep build/Claudette.app && ditto -c -k --keepParent build/Claudette.app build/Claudette.zip && shasum -a 256 build/Claudette.zip | tee build/Claudette.sha256 && echo finished packaging the release for distribution on this machine only"
+    let t = ToolActivity(
+      toolUseID: "t1", toolName: "Bash",
+      input: .object(["command": .string(command), "description": .string("Package a release")]),
+      startedAt: Date())
+    _ = w.touch(
+      for: "5e3a91c2-aaaa-bbbb-cccc-0123456789ab", tool: t,
+      scene: .shell(long: false, background: false), cwd: "/Users/me/programming/Claudette",
+      now: Date())
+    w.finish(
+      toolUseID: "t1",
+      result: ToolResult(success: true, durationMs: 15286, summary: "Compiling…\nBuild complete!"))
+    return w.all[0]
+  }
+
+  /// A terminal item with its hover text open (left) and its detail window content (right).
+  static func renderHover(to url: URL) -> Bool {
+    let item = sampleItem()
+    let scene = SKScene(size: CGSize(width: 1100, height: 330))
+    scene.anchorPoint = .zero
+    scene.backgroundColor = NSColor(white: 0.25, alpha: 1)
+    let node = ItemNode(
+      id: item.id, scene: .shell(long: false, background: false), display: 0, privacy: false,
+      uiScale: 1)
+    node.restyle(
+      .shell(long: false, background: false), caption: "done", command: item.terminal?.command)
+    node.tooltipLines = { ItemDetails.hover(item) }
+    node.position = CGPoint(x: 260, y: 90)
+    scene.addChild(node)
+    node.pointerEntered()
+    node.removeAllActions()
+    for child in node.children where child.alpha < 1 { child.alpha = 1 }
+    let view = SKView(frame: CGRect(origin: .zero, size: scene.size))
+    view.presentScene(scene)
+    guard let texture = view.texture(from: scene) else { return false }
+    let left = NSBitmapImageRep(cgImage: texture.cgImage())
+
+    let host = NSHostingView(
+      rootView: ItemDetailView(
+        title: item.label, rows: ItemDetails.rows(item), command: item.terminal?.command))
+    host.appearance = NSAppearance(named: .aqua)
+    host.frame = CGRect(x: 0, y: 0, width: 560, height: 420)
+    host.layoutSubtreeIfNeeded()
+    guard let right = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return false }
+    host.cacheDisplay(in: host.bounds, to: right)
+
+    let out = NSImage(size: NSSize(width: 1100 + 580, height: 420))
+    out.lockFocus()
+    NSColor.windowBackgroundColor.setFill()
+    NSRect(x: 0, y: 0, width: 1680, height: 420).fill()
+    left.draw(in: NSRect(x: 0, y: 45, width: 1100, height: 330))
+    right.draw(in: NSRect(x: 1110, y: 0, width: 560, height: 420))
+    out.unlockFocus()
+    guard let tiff = out.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+      let png = rep.representation(using: .png, properties: [:])
+    else { return false }
     return (try? png.write(to: url)) != nil
   }
 }

@@ -35,6 +35,18 @@ Both steps ask for confirmation first and show exactly which file they change.
   limit lifts there is confetti. The menubar icon is Claudette herself with a status dot; the limit levels are the first line of its menu.
 - Context window = the little backpack on her left shoulder.
 
+## Hover and click on things
+
+- Hovering an item shows a short summary: a terminal's command wrapped to a few lines (with an ellipsis if
+  it is long), its status and the last line of its result; a file's path; a search's pattern; a skill's name.
+- **Click** a file to reveal it in Finder. Click anything else (a terminal, a search, a web fetch, an MCP
+  tool, a skill) to open a window with everything we know: the full command, the result, which session and
+  project and folder it came from, and when. Privacy mode keeps this closed.
+- With "Dodge the pointer" on, items and all Claudettes (sub-agents too) step away from the pointer.
+  **Hold Option** to hover and click them (or grab and drag them).
+- Claudettes steer around each other while they walk, and keep clear of a magnified Dock: nothing is
+  dropped or walks into the strip above the Dock (it uses the Dock's magnified size from System Settings).
+
 ## Cleaning up
 
 - Menubar **Clean up** (or Settings, Behaviour, **Clean up now**): every Claudette finds what is lying

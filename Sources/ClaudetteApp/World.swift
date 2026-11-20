@@ -157,7 +157,8 @@ final class World {
   private func fall(_ a: Actor) -> SKAction {
     let start = stage.feet(of: a)
     let k = stage.scale * a.sizeFactor
-    let vf = stage.screen(a.display)?.visibleFrame ?? stage.screenFrames.first ?? .zero
+    let vf =
+      stage.screen(a.display).map { stage.walkFrame(for: $0) } ?? stage.screenFrames.first ?? .zero
     let groundY = vf.minY + 24 + 6 * k  // the row the layout stands her on
     let drop = max(0, start.y - groundY)
     let duration = max(0.15, sqrt(Double(drop) / 1800))  // free fall
@@ -329,6 +330,7 @@ final class World {
       id: item.id, scene: scene, display: display, privacy: privacy, uiScale: stage.scale)
     node.originOfDisplay = { [weak stage] d in stage?.screen(d)?.frame.origin ?? .zero }
     node.onDropped = { [weak self] n, p in self?.dropped(n, at: p) }
+    node.onClicked = { [weak self] n in self?.itemClicked(n) }
     node.tooltipLines = { [weak self] in self?.tooltip(for: item.id) ?? [] }
     if let command = item.terminal?.command { node.showCommand(command) }
     let origin = node.originOfDisplay(display)
@@ -346,6 +348,69 @@ final class World {
     stage.draggables.removeAll { $0 === node }
     node.pointerExited()
     node.run(.sequence([.fadeOut(withDuration: 0.4), .removeFromParent()]))
+  }
+
+  // MARK: Items keep away from the pointer
+
+  private var itemDodgedAt: [ItemID: Date] = [:]
+
+  /// With dodging on (and Option not held) things on the screen step away from the pointer, so
+  /// they never get in the way of what is behind them. Option lets you hover and click them.
+  func dodgeItems(from pointer: CGPoint) {
+    let now = Date()
+    let busy = Set(stage.allActors.compactMap { $0.task?.item })
+    for (id, node) in nodes {
+      guard node.parent is SKScene, !node.isBeingDragged, !busy.contains(id) else { continue }
+      if let t = itemDodgedAt[id], now.timeIntervalSince(t) < 0.45 { continue }
+      let c = node.globalCenter
+      guard hypot(c.x - pointer.x, c.y - pointer.y) < 62 * node.xScale else { continue }
+      itemDodgedAt[id] = now
+      flee(node, from: pointer)
+    }
+    if itemDodgedAt.count > 400 { itemDodgedAt = itemDodgedAt.filter { nodes[$0.key] != nil } }
+  }
+
+  private func flee(_ node: ItemNode, from pointer: CGPoint) {
+    let c = node.globalCenter
+    var ang = atan2(c.y - pointer.y, c.x - pointer.x)
+    if hypot(c.x - pointer.x, c.y - pointer.y) < 1 {
+      ang = Double.random(in: 0..<(2 * .pi), using: &rng)
+    }
+    let others = model.all.filter { $0.id != node.itemID }.compactMap(\.position)
+    let step = 150 * stage.scale
+    var best: (spot: CGPoint, room: CGFloat)?
+    for off in [0.0, 35, -35, 70, -70, 110, -110] {
+      let a = ang + off * .pi / 180
+      let cand = CGPoint(x: c.x + step * cos(a), y: c.y + step * sin(a))
+      let size = ItemNode.footprint
+      let fitted = ScreenFit.clamp(
+        CGPoint(x: cand.x - size.width / 2, y: cand.y - size.height / 2), size: size,
+        to: stage.screenFrames)
+      let spot = CGPoint(x: fitted.x + size.width / 2, y: fitted.y + size.height / 2)
+      guard hypot(spot.x - c.x, spot.y - c.y) > 40 else { continue }  // cornered that way
+      let room = others.map { hypot(spot.x - $0.x, spot.y - $0.y) }.min() ?? .infinity
+      if room >= 70 {
+        best = (spot, room)
+        break
+      }
+      if room > (best?.room ?? -1) { best = (spot, room) }
+    }
+    guard let target = best?.spot else { return }
+    let settled = settle(node, at: target)
+    let scene = stage.overlay.overlays[node.display]?.scene
+    if node.parent !== scene {
+      node.removeFromParent()
+      scene?.addChild(node)
+    }
+    model.move(node.itemID, to: settled.center, display: node.display)
+    let go = SKAction.move(to: settled.scenePosition, duration: 0.22)
+    go.timingMode = .easeOut
+    node.run(
+      .group([
+        go,
+        .sequence([.rotate(toAngle: 0.25, duration: 0.11), .rotate(toAngle: 0, duration: 0.11)]),
+      ]), withKey: "dodge")
+    stage.noteActivity()
   }
 
   /// Privacy mode changed: names on items already lying around are redrawn.
@@ -373,24 +438,23 @@ final class World {
     for node in nodes.values { node.setUIScale(stage.scale) }
   }
 
+  /// A few short lines on hover: the whole thing when it is short, a wrapped summary otherwise.
   private func tooltip(for id: ItemID) -> [String] {
     guard let item = model.item(id) else { return [] }
-    if privacy { return ["•••"] }
-    switch item.kind {
-    case .file: return [String(id.raw.dropFirst("file:".count))]
-    case .terminal:
-      guard let t = item.terminal else { return [] }
-      var lines = [t.command.split(separator: "\n").first.map(String.init) ?? t.command]
-      switch t.state {
-      case .running: lines.append("running…")
-      case .done, .failed:
-        let secs = t.result?.durationMs.map { String(format: " · %.1f s", Double($0) / 1000) } ?? ""
-        lines.append((t.state == .done ? "done" : "failed") + secs)
-        if let tail = t.result?.summary?.split(separator: "\n").last { lines.append(String(tail)) }
+    return privacy ? ["•••"] : ItemDetails.hover(item)
+  }
+
+  /// A click: a file is revealed in Finder; anything else opens a window with everything we know.
+  private func itemClicked(_ node: ItemNode) {
+    guard !privacy, let item = model.item(node.itemID) else { return }
+    if item.kind == .file {
+      let path = String(node.itemID.raw.dropFirst("file:".count))
+      if FileManager.default.fileExists(atPath: path) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+        return
       }
-      return lines
-    case .tool: return []
     }
+    ItemDetailWindows.shared.show(item)
   }
 
   /// The mouse dropped an item: keep it fully on a screen, on whichever display it landed, and send
@@ -418,7 +482,15 @@ final class World {
     let sub = a.parent
     return BrainActor(
       position: stage.feet(of: a), holding: a.held?.itemID, isSubagent: sub != nil,
-      anchor: sub.map { stage.feet(of: $0) }, leash: sub == nil ? 0 : leash, task: a.task)
+      anchor: sub.map { stage.feet(of: $0) }, leash: sub == nil ? 0 : leash, task: a.task,
+      others: othersFeet(of: a), gap: personalSpace(a))
+  }
+
+  /// How much room she keeps around herself (sub-agents are smaller).
+  func personalSpace(_ a: Actor) -> CGFloat { (a.sizeFactor < 1 ? 110 : 140) * stage.scale }
+
+  func othersFeet(of a: Actor) -> [CGPoint] {
+    stage.allActors.filter { $0 !== a && $0.visible }.map { stage.feet(of: $0) }
   }
 
   func run(_ intents: [Intent], for a: Actor, wandering: Bool = false) {
@@ -471,17 +543,25 @@ final class World {
     stage.noteActivity()
   }
 
-  /// A walk from `start` (where the previous step leaves her, not where she stands now).
+  /// Remembers where she really was when a walk began (an earlier nudge may have moved her).
+  private final class WalkStart { var point: CGPoint? }
+
+  /// A walk to `target`. `start` (where the plan expects her to be) only sets how long it takes; the
+  /// path begins wherever she is when the walk starts, and keeps clear of the other Claudettes.
   func walk(_ a: Actor, from start: CGPoint, to target: CGPoint) -> SKAction {
     let dist = hypot(target.x - start.x, target.y - start.y)
     guard dist > 1 else { return .wait(forDuration: 0) }
     let duration = stage.reduceMotion ? 0.05 : max(0.2, Double(dist) / (140 * Double(stage.scale)))
+    let begin = WalkStart()
     let move = SKAction.customAction(withDuration: duration) { [weak self, weak a] _, elapsed in
       guard let self, let a else { return }
+      let from = begin.point ?? self.stage.feet(of: a)
+      begin.point = from
       let t = min(1, CGFloat(elapsed) / CGFloat(duration))
       let k = t * t * (3 - 2 * t)  // ease in and out
+      let p = CGPoint(x: from.x + (target.x - from.x) * k, y: from.y + (target.y - from.y) * k)
       self.stage.setFeet(
-        a, CGPoint(x: start.x + (target.x - start.x) * k, y: start.y + (target.y - start.y) * k))
+        a, Separation.push(p, awayFrom: self.othersFeet(of: a), minGap: self.personalSpace(a)))
     }
     return .sequence([
       .run { [weak a] in a?.puppet.setWalking(true) }, move,

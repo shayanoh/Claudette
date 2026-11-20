@@ -18,8 +18,13 @@ final class ItemNode: SKNode, Draggable {
   /// Global origin (lower-left) of a display, to turn scene coordinates into screen coordinates.
   var originOfDisplay: (CGDirectDisplayID) -> CGPoint = { _ in .zero }
   var onDropped: ((ItemNode, CGPoint) -> Void)?
+  /// A press and release with (almost) no movement.
+  var onClicked: ((ItemNode) -> Void)?
+  private var dragOrigin = CGPoint.zero
+  private var movedFar = false
   private var grab = CGPoint.zero
   private var isDragging = false
+  var isBeingDragged: Bool { isDragging }
   private var tip: SKNode?
 
   static let footprint = CGSize(width: 64, height: 80)
@@ -164,6 +169,8 @@ final class ItemNode: SKNode, Draggable {
   func dragBegan(at point: CGPoint) {
     pointerExited()
     isDragging = true
+    dragOrigin = point
+    movedFar = false
     removeAllActions()
     zPosition = Stage.overlayZ - 5
     let c = globalCenter
@@ -173,6 +180,11 @@ final class ItemNode: SKNode, Draggable {
 
   func dragMoved(to point: CGPoint) {
     guard isDragging else { return }
+    if !movedFar {
+      // Under 4 pt it is still a click, not a drag.
+      guard hypot(point.x - dragOrigin.x, point.y - dragOrigin.y) > 4 else { return }
+      movedFar = true
+    }
     let o = originOfDisplay(display)
     position = CGPoint(x: point.x + grab.x - o.x, y: point.y + grab.y - o.y)
   }
@@ -182,6 +194,6 @@ final class ItemNode: SKNode, Draggable {
     isDragging = false
     zPosition = 0
     run(.scale(by: 1 / 1.12, duration: 0.1))
-    onDropped?(self, globalCenter)
+    if movedFar { onDropped?(self, globalCenter) } else { onClicked?(self) }
   }
 }

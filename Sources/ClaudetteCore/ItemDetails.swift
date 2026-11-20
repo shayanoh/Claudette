@@ -14,7 +14,7 @@ public enum ItemDetails {
     "Command", "File", "Path", "Folder", "URL", "Pattern", "Result (last 200 characters)",
   ]
 
-  static func kindName(_ item: Item) -> String {
+  public static func kindName(_ item: Item) -> String {
     switch item.kind {
     case .file: return "File"
     case .terminal: return "Terminal"

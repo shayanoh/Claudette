@@ -137,9 +137,21 @@ final class Stage {
     NSScreen.screens.first { OverlayController.displayID(of: $0) == display }
   }
 
-  var screenFrames: [CGRect] { NSScreen.screens.map(\.frame) }
+  /// Where she and items may go: each screen minus the menu bar and the Dock, with room for a
+  /// magnified Dock. (Hit-testing which display a point is on still uses the full frames.)
+  var screenFrames: [CGRect] { NSScreen.screens.map { walkFrame(for: $0) } }
 
-  private func rect(_ a: Actor) -> CGRect { CGRect(origin: a.origin, size: spriteSize) }
+  func walkFrame(for screen: NSScreen) -> CGRect {
+    WalkArea.frame(
+      screen: screen.frame, visible: screen.visibleFrame, magnifiedExtra: DockInfo.magnifiedExtra)
+  }
+
+  /// Her clickable size: sub-agents are smaller.
+  func size(of a: Actor) -> CGSize {
+    CGSize(width: spriteSize.width * a.sizeFactor, height: spriteSize.height * a.sizeFactor)
+  }
+
+  private func rect(_ a: Actor) -> CGRect { CGRect(origin: a.origin, size: size(of: a)) }
 
   func display(at point: CGPoint) -> CGDirectDisplayID? {
     for s in NSScreen.screens where s.frame.contains(point) {
@@ -191,6 +203,7 @@ final class Stage {
       actor.projectName =
         settings.settings.privacyMode && !actor.rawProjectName.isEmpty
         ? "•••" : actor.rawProjectName
+      for sub in actor.subs.values { sub.projectName = actor.projectName }
     }
     updatePause()
   }
@@ -445,6 +458,7 @@ final class Stage {
   }
 
   private func screensChanged() {
+    DockInfo.invalidate()  // the Dock may have been resized or moved
     defer { world.relocateItems() }
     for a in actors.values {
       if screen(a.display) == nil, let main = overlay.mainDisplayID { a.display = main }
@@ -469,7 +483,7 @@ final class Stage {
         $0.order < $1.order
       }
       let result = Placement.layout(
-        count: free.count, screen: screen.visibleFrame, spriteSize: spriteSize)
+        count: free.count, screen: walkFrame(for: screen), spriteSize: spriteSize)
       for (i, a) in free.enumerated() {
         a.visible = i < result.full.count
         if a.visible { a.origin = result.full[i] }
@@ -538,14 +552,17 @@ final class Stage {
   /// Holding Option keeps her still so she can be grabbed and dragged.
   func pointerMoved(_ p: CGPoint, modifiers: NSEvent.ModifierFlags = []) {
     lastPointer = p
-    if actors.values.contains(where: { rect($0).insetBy(dx: -300, dy: -300).contains(p) }) {
+    if allActors.contains(where: { rect($0).insetBy(dx: -300, dy: -300).contains(p) }) {
       noteActivity()
     }
     updateDraggableHover(p)
     updateMouseTransparency(p)
     guard dragging == nil else { return }
     let s = settings.settings
-    for a in actors.values where a.visible {
+    if s.dodgeEnabled && !reduceMotion && !modifiers.contains(.option) {
+      world.dodgeItems(from: p)
+    }
+    for a in allActors where a.visible {
       let r = rect(a)
       let inside = r.contains(p)
       var cornered = false
@@ -553,9 +570,9 @@ final class Stage {
         && !a.isDodging
         && Date().timeIntervalSince(a.lastDodge) > 0.35
       {
-        let others = actors.values.filter { $0 !== a && $0.visible }.map(rect)
+        let others = allActors.filter { $0 !== a && $0.visible }.map(rect)
         if let next = DodgePlanner.nextPosition(
-          sprite: r, pointer: p, screens: NSScreen.screens.map(\.visibleFrame), shyness: s.shyness,
+          sprite: r, pointer: p, screens: screenFrames, shyness: s.shyness,
           otherSprites: others)
         {
           if next != r.origin { dodge(a, to: next) }
@@ -573,7 +590,7 @@ final class Stage {
   }
 
   private func updateMouseTransparency(_ p: CGPoint) {
-    let over = actors.values.contains { $0.visible && rect($0).insetBy(dx: -4, dy: -4).contains(p) }
+    let over = allActors.contains { $0.visible && rect($0).insetBy(dx: -4, dy: -4).contains(p) }
     let overOther = draggables.contains { $0.hitRect.insetBy(dx: -4, dy: -4).contains(p) }
     let capture = dragging != nil || draggingOther != nil || over || overOther
     overlay.overlays.values.forEach { $0.panel.ignoresMouseEvents = !capture }
@@ -647,12 +664,12 @@ final class Stage {
   private func tick() {
     updateFrameRate()
     world.tickSubs()
-    for a in actors.values { placeNameTag(a) }
+    for a in allActors { placeNameTag(a) }
     tickCount += 1
     if tickCount % 2 == 0 { world.tickPerch() }  // about 2 Hz
     let now = Date()
     var needsLayout = false
-    for a in actors.values {
+    for a in allActors {
       if let since = a.hoverSince, !a.petted, now.timeIntervalSince(since) >= 2 {
         a.petted = true
         a.puppet.happy()
@@ -673,8 +690,8 @@ final class Stage {
   func mouseDown(_ p: CGPoint) {
     noteActivity()
     guard
-      let a = actors.values.filter({ $0.visible && rect($0).contains(p) }).max(by: {
-        $0.order < $1.order
+      let a = allActors.filter({ $0.visible && rect($0).contains(p) }).max(by: {
+        $0.puppet.zPosition < $1.puppet.zPosition
       })
     else {
       if let d = draggable(at: p) {
@@ -740,7 +757,7 @@ final class Stage {
     let frame = screen(a.display)?.frame ?? screenFrames.first ?? .zero
     if hypot(v.dx, v.dy) > 200 {
       let path = DragPhysics.glide(
-        from: a.origin, velocity: v, screen: frame, spriteSize: spriteSize)
+        from: a.origin, velocity: v, screen: frame, spriteSize: size(of: a))
       a.origin = path.last ?? a.origin
       let steps = path.map { point -> SKAction in
         let saved = a.origin
@@ -751,7 +768,7 @@ final class Stage {
       }
       a.puppet.run(.sequence(steps), withKey: "move")
     } else {
-      a.origin = ScreenFit.clamp(a.origin, size: spriteSize, to: screenFrames)
+      a.origin = ScreenFit.clamp(a.origin, size: size(of: a), to: screenFrames)
       a.puppet.run(.move(to: scenePosition(a), duration: 0.1), withKey: "move")
     }
     a.puppet.drop()
