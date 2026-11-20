@@ -17,9 +17,11 @@ public enum PluginInstaller {
     "Notification", "Elicitation",
   ]
 
-  public static func hooksJSON(port: Int) -> Data {
+  /// Hooks run this script instead of `http` handlers: an `http` hook reports an error in Claude
+  /// Code whenever the app is closed, a script that always exits 0 never does.
+  public static func hooksJSON(port: Int, scriptPath: String) -> Data {
     let handler: [String: Any] = [
-      "type": "http", "url": "http://127.0.0.1:\(port)/hook", "timeout": 2,
+      "type": "command", "command": shellQuote(scriptPath), "timeout": 5,
     ]
     var map: [String: Any] = [:]
     for event in events { map[event] = [["hooks": [handler]]] }
@@ -30,6 +32,25 @@ public enum PluginInstaller {
     // Dictionaries of plain JSON values always serialise; failure would be a programming error.
     return try! JSONSerialization.data(
       withJSONObject: root, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+  }
+
+  /// Reads the event, posts it in a detached background `curl`, and always exits 0. Command hooks
+  /// block Claude Code until they exit, so nothing here may wait on the network.
+  public static func hookScript(port: Int) -> String {
+    """
+    #!/bin/sh
+    # Claudette hook forwarder: never fails, never blocks, prints nothing.
+    body=$(cat)
+    ( printf '%s' "$body" | curl -s -m 2 --connect-timeout 1 -X POST \
+      -H 'Content-Type: application/json' --data-binary @- \
+      "http://127.0.0.1:\(port)/hook" >/dev/null 2>&1 & ) >/dev/null 2>&1
+    exit 0
+
+    """
+  }
+
+  static func shellQuote(_ s: String) -> String {
+    "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
   }
 
   /// `~/.claude/skills/claudette`: Claude Code loads a plugin saved here with no install step.
@@ -45,6 +66,15 @@ public enum PluginInstaller {
       let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     else { return false }
     return obj["name"] as? String == "claudette"
+  }
+
+  /// An install whose hooks are the old noisy `http` handlers (offered an update in Settings).
+  public static func isLegacy(pluginDir: URL) -> Bool {
+    guard isInstalled(pluginDir: pluginDir),
+      let text = try? String(
+        contentsOf: pluginDir.appendingPathComponent("hooks/hooks.json"), encoding: .utf8)
+    else { return false }
+    return text.contains("\"type\" : \"http\"") || text.contains("\"type\":\"http\"")
   }
 
   /// Writes (or updates) the plugin. Refuses to touch a non-empty directory that is not ours.
@@ -80,7 +110,10 @@ public enum PluginInstaller {
       withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
     try manifestData.write(
       to: dir.appendingPathComponent(".claude-plugin/plugin.json"), options: .atomic)
-    try hooksJSON(port: port).write(
+    let script = dir.appendingPathComponent("hooks/post.sh")
+    try Data(hookScript(port: port).utf8).write(to: script, options: .atomic)
+    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+    try hooksJSON(port: port, scriptPath: script.path).write(
       to: dir.appendingPathComponent("hooks/hooks.json"), options: .atomic)
   }
 }
