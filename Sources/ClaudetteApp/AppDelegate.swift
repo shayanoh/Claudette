@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     statusItem = item
     item.button?.image = MenuBarGlyph.image(
       five: model.limits.state(.fiveHour), seven: model.limits.state(.sevenDay), dot: nil)
+    settingsModel.onCleanUp = { [model] in model.stage.world.cleanUpAll() }
     model.hud.onGlyph = { [weak self] image in self?.statusItem?.button?.image = image }
     feedStatus = model.start()
     runDebugHooks()

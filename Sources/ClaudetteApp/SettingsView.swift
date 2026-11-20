@@ -28,6 +28,8 @@ final class SettingsModel: ObservableObject {
   @Published var pluginNeedsUpdate = false
   @Published var statusLine = InstallState.notInstalled
   @Published var message = ""
+  /// Set by the app delegate: runs the cleanup scene (the same as the menubar "Clean up").
+  var onCleanUp: (() -> Void)?
 
   init(store: SettingsStore, activeProjectDirs: @escaping () -> [String]) {
     self.store = store
@@ -239,6 +241,29 @@ struct SettingsView: View {
             get: { Double(s.itemCap) },
             set: { v in model.set { $0.itemCap = Int(v.rounded()) } }),
           range: 20...120, minLabel: "20", maxLabel: "120", readout: "\(s.itemCap) items")
+        Toggle(isOn: binding(\.autoCleanup)) {
+          Text("Tidy up while waiting")
+          Text("When a session waits for you, its Claudette clears away some of her own mess.")
+        }
+        SliderRow(
+          title: "Tidy-up threshold",
+          caption: "How many items one session may leave lying around before she starts clearing.",
+          value: Binding(
+            get: { Double(s.clutterSoftLimit) },
+            set: { v in model.set { $0.clutterSoftLimit = Int(v.rounded()) } }),
+          range: 4...40, minLabel: "4", maxLabel: "40", readout: "\(s.clutterSoftLimit) items"
+        )
+        .disabled(!s.autoCleanup)
+        HStack {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Clean up now")
+            Text("Everyone collects everything left on screen and throws it in a trash can.")
+              .font(.callout).foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          Spacer()
+          Button("Clean up") { model.onCleanUp?() }
+        }
       } header: {
         SectionHeader(title: "Behaviour", symbol: "figure.walk")
       }

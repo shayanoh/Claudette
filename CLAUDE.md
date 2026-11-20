@@ -11,6 +11,10 @@ See `README.md` for the vision, `docs/architecture.md` for how it fits together.
 - Art: style "Ink & Cel" (B) + A's soft shadow; all character/visual design is produced by an
   Opus 5.5 subagent (user rule). On-screen art is the Opus-drawn export in `art/export/` (regenerate
   with `scripts/art.sh`); shape placeholders in `PuppetNode`/`Props` remain only as the fallback.
+- World model (2026-11): items are objects of the stage, not props of a puppet. Rules live in
+  `ClaudetteCore` (`WorldModel`, `Scatter`, `Brain`, `PerchPlanner`, `CleanupPlanner`/`ClutterPolicy`),
+  unit tested; `ClaudetteApp` (`World`, `ItemNode`, `Stage`) only animates. SpriteKit sorts by global z
+  (`ignoresSiblingOrder`): every Claudette needs her own z band (`Stage.bringToFront`).
 - Charm first, glanceable status (approval, question, errors, limits) second.
 - Distribution: build from source, ad-hoc signed, non-sandboxed, macOS 14+, no notarisation.
 
@@ -36,5 +40,8 @@ See `README.md` for the vision, `docs/architecture.md` for how it fits together.
   unplug/replug, 30-min soak.
 - Synthetic mouse clicks are blocked without Accessibility permission for the harness; moves work.
   `CLAUDETTE_DEBUG_DRAGTEST` exercises the drag code path instead.
+- Small-region screenshots only. The screen may be locked or on the screensaver (a video wallpaper in a
+  capture means the overlay cannot be seen): do not work around it, check with the user. Never
+  full-screen capture.
 - Swift is formatted with `swift format -i`; validate all external input.
 - The macOS here is an Intel i7-7820HQ: measure CPU/battery changes with `ps -o %cpu,rss`.

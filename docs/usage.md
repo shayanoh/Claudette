@@ -35,6 +35,16 @@ Both steps ask for confirmation first and show exactly which file they change.
   limit lifts there is confetti. The menubar icon is Claudette herself with a status dot; the limit levels are the first line of its menu.
 - Context window = the little backpack on her left shoulder.
 
+## Cleaning up
+
+- Menubar **Clean up** (or Settings, Behaviour, **Clean up now**): every Claudette finds what is lying
+  around and carries it to a trash can that slides in, clumsily (she may trip and drop things, or miss
+  the can), 10 to 30 seconds depending on the mess. Work that arrives meanwhile is not collected.
+- When a session is waiting for you (approval, a question, a finished turn) and its own items pass the
+  tidy-up threshold (Settings, default 12), its Claudette clears the oldest down to half of that. New
+  work interrupts it politely.
+- When a session ends, its Claudette collects everything only that session used before she leaves.
+
 ## Playing with her
 
 - Drag her anywhere; flick her and she slides to a stop. Her spot is remembered per session.

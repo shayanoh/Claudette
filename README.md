@@ -3,10 +3,15 @@
 A macOS menubar-only app (no Dock icon) that gives Claude Code a face: a cute, animated
 Claude-mascot avatar that lives on your desktop and acts out what Claude Code is doing.
 
-- One Claudette per running Claude Code session; sub-agents appear as mini-Claudettes.
-- Sessions start (she pops in) and end (she falls asleep and leaves).
-- Every tool call is a little scene: reading a file, searching, editing, running scripts, background
-  shells, web, skills and MCP servers (each server gets its own labelled cartridge).
+- One Claudette per running Claude Code session; sub-agents are small Claudettes that roam near her
+  and work on their own.
+- Sessions start (she yawns and stretches) and end (she tidies up, falls asleep and leaves).
+- Every tool call leaves something on your screen: a file she reads and tosses, a terminal showing
+  its command, a skill, an MCP cartridge. She walks to them, they stay where they land, the same file is
+  the same item for every session, and you can drag them around. She paces while Claude thinks, perches
+  on window tops, carries things with her when she is shy. A busy session leaves a mess; she clears it
+  up on her own when the session waits for you, and the menubar **Clean up** sends everybody to the
+  trash can.
 - Glanceable status: waiting for approval, Claude has a question, API/sign-in/billing/rate-limit errors.
 - Usage limits as a little world: a jar of sparks (5-hour window) and a moon (weekly window), a night
   nap when you hit the limit, confetti when it lifts.
@@ -14,8 +19,8 @@ Claude-mascot avatar that lives on your desktop and acts out what Claude Code is
   your text, scales from 50% to 200%, and shows up on every desktop.
 - Everything stays on your Mac: Claude Code talks to Claudette over `127.0.0.1` only.
 
-> Status: foundation complete with placeholder shape art. The final character art (style
-> "Ink & Cel", see `design/concepts/opus/`) and the full animation set come next.
+> Status: character art, the world of persistent items, cleanup and the full animation set are in.
+> Not yet checked live: perching on a real moving window, and a long soak (see `docs/architecture.md`).
 
 ## Build and run
 
