@@ -261,9 +261,36 @@ final class MoonHandle: Draggable {
   }
 }
 
-/// Draws the 22x16 menubar glyph: a small jar plus a moon, mirroring the limit state.
+/// The menubar icon: Claudette's silhouette (the `menubar` art asset) tinted like the menubar text,
+/// plus a coloured status dot. Limit levels live in the menu header, not in the icon.
+/// Without the art export it falls back to the old jar-and-moon glyph.
 enum MenuBarGlyph {
   static func image(five: WindowState, seven: WindowState, dot: NSColor?) -> NSImage {
+    if let lib = ArtLibrary.shared, let asset = lib.asset("menubar"),
+      let icon = NSImage(contentsOf: lib.directory.appendingPathComponent(asset.file))
+    {
+      let size = NSSize(width: CGFloat(asset.size[0]), height: CGFloat(asset.size[1]))
+      return NSImage(size: NSSize(width: size.width + 4, height: size.height), flipped: false) {
+        _ in
+        let r = NSRect(origin: .zero, size: size)
+        icon.draw(in: r)
+        NSColor.labelColor.setFill()
+        r.fill(using: .sourceIn)
+        if let dot {
+          dot.setFill()
+          // Top-right corner: clear of the spark's rays (see the art report).
+          NSBezierPath(ovalIn: NSRect(x: size.width - 2, y: size.height - 6, width: 6, height: 6))
+            .fill()
+        }
+        return true
+      }
+    }
+    return fallbackImage(five: five, seven: seven, dot: dot)
+  }
+
+  private static func fallbackImage(five: WindowState, seven: WindowState, dot: NSColor?)
+    -> NSImage
+  {
     NSImage(size: NSSize(width: 34, height: 16), flipped: false) { _ in
       let ink = NSColor.labelColor
       // jar

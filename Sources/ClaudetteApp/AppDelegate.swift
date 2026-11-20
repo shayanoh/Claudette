@@ -17,11 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.accessory)
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    item.button?.title = "C"
     let menu = NSMenu()
     menu.delegate = self
     item.menu = menu
     statusItem = item
+    item.button?.image = MenuBarGlyph.image(
+      five: model.limits.state(.fiveHour), seven: model.limits.state(.sevenDay), dot: nil)
     model.hud.onGlyph = { [weak self] image in self?.statusItem?.button?.image = image }
     feedStatus = model.start()
     runDebugHooks()
@@ -32,6 +33,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   func menuNeedsUpdate(_ menu: NSMenu) {
     menu.removeAllItems()
     let privacy = model.settings.settings.privacyMode
+    let five = model.limits.state(.fiveHour)
+    let seven = model.limits.state(.sevenDay)
+    if five.status != .unknown || seven.status != .unknown {
+      var parts: [String] = []
+      if five.status != .unknown { parts.append("5h \(LimitText.percent(five))") }
+      if seven.status != .unknown { parts.append("week \(LimitText.percent(seven))") }
+      let header = NSMenuItem(title: parts.joined(separator: " · "), action: nil, keyEquivalent: "")
+      header.isEnabled = false
+      menu.addItem(header)
+      menu.addItem(.separator())
+    }
     let sessions = model.store.sessions.values.sorted { $0.startedAt < $1.startedAt }
     if sessions.isEmpty {
       menu.addItem(withTitle: "No Claude Code sessions", action: nil, keyEquivalent: "")

@@ -53,6 +53,7 @@ PARTS = {
     "jar_lid": (P.jar_lid, "jar_glass", (0, 33), 2),  # 1 pt overlap seats it on the rim
     "moon_dark": (P.moon_dark, None, None, 0),
     "moon_lit": (P.moon_lit, None, None, 1),
+    "menubar": (P.menubar, None, None, 0),  # template image for the status item, not a rig part
     # Sleep scenes. Blankets sit above the body (1) and below the face (4).
     "blanket": (Sl.blanket, "bodyPivot", (0, -2), 3),
     "blanket_deep": (Sl.blanket_deep, "bodyPivot", (0, -2), 3),
@@ -292,7 +293,7 @@ def figure(assets, uris, names, cx, ground, k, swap=None, levels=None, filters=N
 TINTS = ["#7FC8F8", "#FFC94D", "#E5484D"]  # sample runtime tints for the cartridge check
 SCARF_TINTS = ["#7FC8F8", "#9BE38B", "#F29BC0", "#B9A6E8", "#FFC94D"]  # sample project hues
 LEVEL = {"bag_fill": 0.55, "jar_fill": 0.6}  # sheet preview of the fill levels
-CHARACTER = [n for n in PARTS if n not in ("jar_glass", "jar_fill", "jar_lid", "moon_dark", "moon_lit",
+CHARACTER = [n for n in PARTS if n not in ("jar_glass", "jar_fill", "jar_lid", "moon_dark", "moon_lit", "menubar",
                                              "blanket", "blanket_deep", "night_patch", "scarf", "scarf_tail")
              and not n.startswith("outfit_")]
 POSES = [  # (hidden parts, swaps)

@@ -313,3 +313,24 @@ def spark(r=SPARK_R, sw=HALF):
            f'<g stroke="{C["spark"]}" stroke-width="{core:.2f}" stroke-linecap="round">{rays}</g>')
     e = r + core / 2 + sw
     return svg, (-e, -e, e, e)
+
+
+def menubar():
+    """18 pt menubar template glyph: solid black, alpha only. Pivot = centre. The returned box is
+    1 pt inside the art on every side, so the exporter's 1 pt margin becomes art and the canvas
+    is exactly 18 pt tall. Eyes are knocked out of the body; nothing under 1.5 pt."""
+    k = "#000"
+    bx, by, bw, bh = -6.6, -0.4, 13.2, 7.0  # body: chunky brick, wider than tall
+    eyes = "".join(rr(x - 0.9, by + 1.6, 1.8, 3.6, 0.9) for x in (-2.5, 2.5))
+    ny = by + bh * 0.48 - 1.4  # nubs centred at 52% of body height, like the rig
+    svg = (f'<path fill-rule="evenodd" fill="{k}" d="{rr(bx, by, bw, bh, 2.2)} {eyes}"/>'
+           + "".join(f'<path fill="{k}" d="{rr(x, ny, 3.2, 2.8, 1.2)}"/>' for x in (bx - 2.2, bx + bw - 1))
+           # four stubby legs, gaps of at least 1.4 pt so they stay separate at 1x
+           + "".join(f'<path fill="{k}" d="{rr(x - 0.85, by + bh - 1, 1.7, 3.4, 0.75)}"/>'
+                     for x in (-4.8, -1.6, 1.6, 4.8)))
+    # Claude spark above the head: 8 round-capped rays, 1.5 pt thick, tips 1 pt apart
+    r, cy = 3.25, -5.0
+    rays = "".join(f'<line x1="0" y1="{cy}" x2="{math.cos(math.radians(i*45))*r*L:.2f}" '
+                   f'y2="{cy+math.sin(math.radians(i*45))*r*L:.2f}"/>' for i, L in enumerate(SPARK_RAYS))
+    svg += f'<g stroke="{k}" stroke-width="1.5" stroke-linecap="round">{rays}</g>'
+    return svg, (-9, -8, 9, 8)

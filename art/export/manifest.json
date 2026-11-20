@@ -469,6 +469,18 @@
       ],
       "variantOf": "leg_3"
     },
+    "menubar": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "menubar.png",
+      "size": [
+        20,
+        18
+      ],
+      "z": 0
+    },
     "moon_dark": {
       "anchor": [
         0.5,
