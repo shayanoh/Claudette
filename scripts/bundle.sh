@@ -7,10 +7,16 @@ swift build -c release
 BIN="$(swift build -c release --show-bin-path)/ClaudetteApp"
 [ -x "$BIN" ] || { echo "build product missing: $BIN" >&2; exit 1; }
 
-APP="build/Claudette.app"
+APP="${APP_OUT:-build/Claudette.app}"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp "$BIN" "$APP/Contents/MacOS/Claudette"
+
+# Art export (manifest + PNGs); the app falls back to shape placeholders if it is missing.
+[ -f art/export/manifest.json ] || { echo "art/export/manifest.json missing (run scripts/art.sh)" >&2; exit 1; }
+mkdir -p "$APP/Contents/Resources"
+cp -R art/export "$APP/Contents/Resources/art"
+rm -f "$APP/Contents/Resources/art/sheet.png"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

@@ -39,6 +39,26 @@ Claude Code  ──hooks (http)──────────────┐
   JSON) and uninstall restores the original bytes when the file is unchanged since install.
 - Rendering pauses when nothing is on screen (0% CPU) and in Focus mode.
 
+## Art pipeline
+
+All character art is drawn by an Opus subagent (project rule) as code: `art/generate.py` (+ `art/src/`)
+draws every part as SVG, `rsvg-convert` rasterises each to an @2x PNG, and the same script writes
+`art/export/manifest.json` (anchor, size, position, z, parent, label slot, tint flag per asset).
+`scripts/art.sh` regenerates and validates (`Claudette --validate-art <dir>`: manifest rules plus every
+PNG's pixel size). The PNGs and manifest are committed, so building the app needs neither Python nor rsvg.
+
+- `ClaudetteCore`: `ArtManifest` (schema, bounds, safe file names, parent cycles) and `ArtNames`
+  (tool scene, error kind, model family, project path to asset or colour; `Accent.hue` uses FNV-1a so
+  colours are the same on every launch; `SleepDepth` = weekly limit beats 5-hour nap).
+- `ClaudetteApp`: `ArtLibrary` (lookup order `CLAUDETTE_ART`, `Claudette.app/Contents/Resources/art`,
+  `./art/export`) feeds `PuppetNode`, `PropNode`, status badges, `LimitsHUD`.
+- Fallback: the character is all-or-nothing (valid manifest and every required part loads, else the whole
+  shape placeholder); props, badges, signs, outfits and scarf fall back one asset at a time.
+- Runtime text (file names, MCP initials, privacy dots, sign times, pill text) is never baked into art;
+  assets only mark a `label` slot. Scarf and MCP cartridges are neutral grey art tinted at runtime.
+- Assets are named `<base>.<variant>` for texture swaps (`eye_L.happy`, `mouth.blep`, `body.sleep_curl`,
+  `leg_0.tuck`); a variant has the same canvas and anchor as its base.
+
 ## Developer switches (environment variables)
 
 | Variable | Effect |
@@ -46,7 +66,10 @@ Claude Code  ──hooks (http)──────────────┐
 | `CLAUDETTE_DEBUG=1` | adds Debug menus (add/end session, simulate scene, simulate limits) |
 | `CLAUDETTE_DEBUG_SPAWN=N` | starts with N fake sessions |
 | `CLAUDETTE_DEBUG_SCENES=a,b,c` | acts out scenes (see `AppModel.scenes`) one per 0.8 s |
-| `CLAUDETTE_DEBUG_LIMITS=fresh,low,limit,lifted` | steps through limit states every 4 s |
+| `CLAUDETTE_DEBUG_LIMITS=fresh,low,limit,weeklimit,lifted` | steps through limit states every 4 s |
+| `CLAUDETTE_DEBUG_MODELS=opus,sonnet,haiku` | gives spawned sessions those models in turn (outfits) |
+| `CLAUDETTE_ART=dir` | art export to use first; `CLAUDETTE_DEBUG_ART=off` forces the shape placeholders |
+| `APP_OUT=dir scripts/bundle.sh` | builds the app bundle somewhere other than `build/Claudette.app` |
 | `CLAUDETTE_DEBUG_DRAGTEST=1` | drags the first character across the screen using the real code path |
 | `CLAUDETTE_LOG_EVENTS=1` | logs raw payloads to `~/Library/Logs/Claudette/events.jsonl` (off by default: prompts) |
 | `CLAUDETTE_HOME=dir` | redirects every `~/.claude` and Application Support path (sandbox for testing) |

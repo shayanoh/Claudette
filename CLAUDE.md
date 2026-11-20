@@ -9,14 +9,18 @@ See `README.md` for the vision, `docs/architecture.md` for how it fits together.
 - Data: Claude Code plugin with `http` hooks -> loopback server (127.0.0.1:47631); status line wrapper
   for usage limits (`rate_limits`), context and model. No `async` on http hooks (not documented).
 - Art: style "Ink & Cel" (B) + A's soft shadow; all character/visual design is produced by an
-  Opus 5.5 subagent (user rule). Current on-screen art is placeholder shapes (`PuppetNode`, `Props`).
+  Opus 5.5 subagent (user rule). On-screen art is the Opus-drawn export in `art/export/` (regenerate
+  with `scripts/art.sh`); shape placeholders in `PuppetNode`/`Props` remain only as the fallback.
 - Charm first, glanceable status (approval, question, errors, limits) second.
 - Distribution: build from source, ad-hoc signed, non-sandboxed, macOS 14+, no notarisation.
 
 ## Layout
 
 - `Sources/ClaudetteCore`: pure, unit-tested logic. Keep UI out of it. `swift test` must stay green.
-- `Sources/ClaudetteApp`: AppKit/SpriteKit/SwiftUI app. Verified by running it (screenshots).
+- `Sources/ClaudetteApp`: AppKit/SpriteKit/SwiftUI app. Verified by running it (screenshots; capture
+  only a small region with `screencapture -R`, never the whole screen: it can hold private windows).
+- `art/`: Opus-authored exporter (`generate.py`, `src/`) and the committed export (`export/`, manifest
+  contract in `ClaudetteCore/ArtManifest.swift`); new art goes through an Opus subagent, then `scripts/art.sh`.
 - `docs/superpowers/specs` (design), `docs/superpowers/plans` (plans), `docs/spikes/payloads.md`
   (real hook payloads and known gaps), `design/concepts/` (concept art).
 - `scripts/bundle.sh` builds `build/Claudette.app`.

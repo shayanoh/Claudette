@@ -33,6 +33,13 @@ source. If macOS blocks the first launch, right-click `Claudette.app`, choose Op
 Then open **Settings…** from the menubar item and install the Claude Code plugin and (optionally) the
 status line connection. See [docs/usage.md](docs/usage.md).
 
+## Art
+
+The character, props, status badges, sleep scenes and the three model outfits (Opus, Sonnet, Haiku) are
+drawn in the "Ink & Cel" style and exported from `art/generate.py` to `art/export/`. The export is
+committed; `scripts/art.sh` regenerates it (needs `rsvg-convert`, from `brew install librsvg`). If the
+export is missing or invalid the app falls back to simple shape art.
+
 ## Privacy
 
 No network access beyond `127.0.0.1`, no telemetry. Raw payload logging is off unless you set
