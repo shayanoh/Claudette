@@ -168,9 +168,7 @@ public final class FeedServer: @unchecked Sendable {
         guard let event = try? HookEvent.decode(body) else { return finish(400) }
         onMessage(.hook(event))
       case "/status":
-        guard let json = try? JSONDecoder().decode(JSONValue.self, from: body),
-          case .object = json
-        else { return finish(400) }
+        guard (try? StatusPayload.decode(body)) != nil else { return finish(400) }
         onMessage(.status(body))
       default:
         return finish(404)

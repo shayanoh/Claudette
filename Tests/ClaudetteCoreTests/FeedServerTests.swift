@@ -74,6 +74,13 @@ private let goodHook = Data(#"{"hook_event_name":"Stop","session_id":"s1"}"#.utf
   #expect(inbox.all.isEmpty)
 }
 
+@Test func statusWithoutSessionIDReturns400() async throws {
+  let (server, inbox, port) = try makeServer()
+  defer { server.stop() }
+  #expect(try await post(port, path: "/status", body: Data(#"{"cwd":"/p"}"#.utf8)) == 400)
+  #expect(inbox.all.isEmpty)
+}
+
 @Test func bodyOver1MiBIsRejectedAndServerSurvives() async throws {
   let (server, inbox, port) = try makeServer()
   defer { server.stop() }
