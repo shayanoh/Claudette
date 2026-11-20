@@ -56,6 +56,11 @@ glances at it to learn "needs me", "long shell running", or "limit hit" without 
     hover; hovering still for a couple of seconds gets petted-happy reactions. Dodge and hover
     fade are independent settings; when both are on, dodging is tried first and fade covers
     the cases where she cannot move away.
+16. **All desktops (Spaces):** Claudette is present on every macOS desktop and over full-screen
+    apps. Switching Spaces keeps her at the same screen position with no flicker (overlay
+    panel uses `canJoinAllSpaces` + `fullScreenAuxiliary` + `stationary` collection
+    behaviour, no Dock icon). A small glance or hop on arrival is optional polish. Needs a
+    real multi-Space check on macOS 14+ during the overlay milestone.
 15. **Settings window** (from the menubar item): size, hover fade on/off and opacity, cursor
     dodging on/off and shyness, privacy mode, Reduce Motion / Focus mode, launch at login,
     install/uninstall the Claude Code plugin and status line wrapper.
