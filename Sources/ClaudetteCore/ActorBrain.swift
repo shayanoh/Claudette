@@ -101,24 +101,15 @@ public struct Brain: Sendable {
       guard let pos = item.position, pos.x.isFinite, pos.y.isFinite else {
         return out + [.play(move)]
       }
-      if isNew {
-        out += [.face(pos), .play(move)]
-        let angle = CGFloat.random(in: 0..<(2 * .pi), using: &rng)
-        let dist = CGFloat.random(in: tossRange, using: &rng)
-        let aim = CGPoint(x: pos.x + dist * cos(angle), y: pos.y + dist * sin(angle))
-        let spot = Scatter.spot(
-          near: aim, existing: world.filter { $0.id != item.id }.compactMap(\.position),
-          itemSize: CGSize(width: 60, height: 60), screens: screens, seed: rng.next())
-        out.append(.toss(item.id, to: spot))
-      } else {
-        out += visit(pos, move: move, from: here, screens: screens)
-      }
       return out
+        + work(item, at: pos, move: move, here: here, world: world, screens: screens, rng: &rng)
     case .itemMoved(let id):
       guard let task = actor.task, task.item == id,
         let pos = world.first(where: { $0.id == id })?.position, pos.x.isFinite, pos.y.isFinite
       else { return [] }
-      return visit(pos, move: task.move, from: here, screens: screens)
+      guard let item = world.first(where: { $0.id == id }) else { return [] }
+      return work(
+        item, at: pos, move: task.move, here: here, world: world, screens: screens, rng: &rng)
     case .thinkingChanged(let on):
       guard on else { return [] }
       return wander(actor: actor, here: here, screens: screens, rng: &rng)
@@ -135,15 +126,25 @@ public struct Brain: Sendable {
     }
   }
 
-  /// Walk next to the item if it is out of reach, then face it and play the move.
-  private func visit(_ pos: CGPoint, move: Move, from here: CGPoint, screens: [CGRect])
-    -> [Intent]
-  {
+  /// Walk next to the item if it is out of reach, face it, pick it up, work on it, then toss it a
+  /// little way off (she holds it meanwhile, so a shy dodge carries it along).
+  private func work(
+    _ item: Item, at pos: CGPoint, move: Move, here: CGPoint, world: [Item], screens: [CGRect],
+    rng: inout some RandomNumberGenerator
+  ) -> [Intent] {
     var out: [Intent] = []
     if distance(here, pos) > reach {
       out.append(.walk(to: fit(toward(pos, from: here, distance: standOff), screens)))
     }
-    return out + [.face(pos), .play(move)]
+    out += [.face(pos), .pickUp(item.id), .play(move)]
+    let angle = CGFloat.random(in: 0..<(2 * .pi), using: &rng)
+    let dist = CGFloat.random(in: tossRange, using: &rng)
+    let aim = CGPoint(x: pos.x + dist * cos(angle), y: pos.y + dist * sin(angle))
+    let spot = Scatter.spot(
+      near: aim, existing: world.filter { $0.id != item.id }.compactMap(\.position),
+      itemSize: CGSize(width: 60, height: 60), screens: screens, seed: rng.next())
+    out.append(.toss(item.id, to: spot))
+    return out
   }
 
   private func wander(

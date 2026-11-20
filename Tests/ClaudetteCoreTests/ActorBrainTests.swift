@@ -34,14 +34,15 @@ private func walks(_ intents: [Intent]) -> [CGPoint] {
   intents.compactMap { if case .walk(let p) = $0 { return p } else { return nil } }
 }
 
-@Test func newItemMakesActorReadInPlaceThenToss() {
+@Test func newItemMakesActorPickItUpReadItThenToss() {
   let it = item("a", at: CGPoint(x: 520, y: 300))
   let intents = plan(.toolStarted(it, isNew: true, move: .read), actor(), world: [it])
-  #expect(intents.count == 3)
+  #expect(intents.count == 4)
   #expect(intents[0] == .face(CGPoint(x: 520, y: 300)))
-  #expect(intents[1] == .play(.read))
-  guard case .toss(let id, let to) = intents[2] else {
-    Issue.record("expected a toss, got \(intents[2])")
+  #expect(intents[1] == .pickUp(it.id))
+  #expect(intents[2] == .play(.read))
+  guard case .toss(let id, let to) = intents[3] else {
+    Issue.record("expected a toss, got \(intents[3])")
     return
   }
   #expect(id == it.id)
@@ -58,8 +59,9 @@ private func walks(_ intents: [Intent]) -> [CGPoint] {
   }
   #expect(abs(hypot(stand.x - 900, stand.y - 600) - 60) < 1)
   #expect(stand.x < 900 && stand.y < 600)  // she stops on her own side of it
+  #expect(intents.contains(.pickUp(it.id)))
   #expect(intents.contains(.play(.read)))
-  #expect(!intents.contains { if case .toss = $0 { return true } else { return false } })
+  #expect(intents.contains { if case .toss = $0 { return true } else { return false } })
 }
 
 @Test func existingItemNearbyIsReadInPlace() {
