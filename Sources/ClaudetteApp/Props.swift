@@ -12,9 +12,12 @@ final class PropNode: SKNode {
   /// Connector plug at the cable's end (art mode).
   var plug: SKSpriteNode?
   let body = SKNode()
+  /// Replaces the scene's usual caption (a finished terminal says "done", not "running").
+  private let captionOverride: String?
 
-  init(scene: ToolScene, privacy: Bool) {
+  init(scene: ToolScene, privacy: Bool, caption: String? = nil) {
     toolScene = scene
+    captionOverride = caption
     super.init()
     cable.strokeColor = Palette.ink
     cable.lineWidth = 3
@@ -57,7 +60,7 @@ final class PropNode: SKNode {
 
   /// A caption under the prop: white text with one soft shadow (see `LabelTexture`).
   func label(_ text: String, y: CGFloat = -34, size: CGFloat = 13) {
-    guard let entry = LabelTexture.entry(text, size: size) else { return }
+    guard let entry = LabelTexture.entry(captionOverride ?? text, size: size) else { return }
     let sprite = SKSpriteNode(texture: entry.texture, size: entry.size)
     sprite.anchorPoint = CGPoint(x: 0.5, y: 1)
     // The texture's top edge is `padding` above the glyphs.

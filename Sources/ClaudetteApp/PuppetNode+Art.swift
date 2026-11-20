@@ -227,3 +227,62 @@ extension PuppetNode {
     (bodyPivot.childNode(withName: "scarf_tail") as? SKSpriteNode)?.color = color
   }
 }
+
+// MARK: - Walking and working (driven by the world, see Stage+World)
+
+extension PuppetNode {
+  /// Alternating leg swing and a small body bounce while she walks across the screen.
+  func setWalking(_ on: Bool) {
+    let swingKey = "walkLegs"
+    let bounceKey = "walkBounce"
+    if on {
+      guard bodyPivot.action(forKey: bounceKey) == nil else { return }
+      let bounce = SKAction.sequence([
+        .moveBy(x: 0, y: 4, duration: 0.13), .moveBy(x: 0, y: -4, duration: 0.13),
+      ])
+      bodyPivot.run(.repeatForever(bounce), withKey: bounceKey)
+      for (i, leg) in legs.enumerated() {
+        let a: CGFloat = i % 2 == 0 ? 0.3 : -0.3
+        leg.run(
+          .repeatForever(
+            .sequence([.rotate(toAngle: a, duration: 0.13), .rotate(toAngle: -a, duration: 0.13)])),
+          withKey: swingKey)
+      }
+    } else {
+      if bodyPivot.action(forKey: bounceKey) != nil {
+        bodyPivot.removeAction(forKey: bounceKey)
+        // The bounce is relative moves: put the body back on its hips.
+        let hip = legs.first?.position.y ?? Self.legLength
+        bodyPivot.position.y = hip
+      }
+      for leg in legs {
+        leg.removeAction(forKey: swingKey)
+        leg.zRotation = 0
+      }
+    }
+  }
+
+  /// A short at-work beat for a tool call: focused eyes and a little bob, then back to normal.
+  func perform(_ move: Move) {
+    switch move {
+    case .read, .typing, .search:
+      setEyes(.focus)
+      bodyPivot.run(
+        .repeat(
+          .sequence([.moveBy(x: 0, y: -3, duration: 0.12), .moveBy(x: 0, y: 3, duration: 0.12)]),
+          count: 4), withKey: "work")
+      run(
+        .sequence([.wait(forDuration: 1.0), .run { [weak self] in self?.setEyes(.open) }]),
+        withKey: "workFace")
+    case .shrug:
+      run(
+        .sequence([
+          .rotate(toAngle: 0.1, duration: 0.12), .rotate(toAngle: -0.1, duration: 0.12),
+          .rotate(toAngle: 0, duration: 0.1),
+        ]), withKey: "shrug")
+    case .celebrate: happy()
+    case .startled: hop()
+    case .think, .yawn, .stretch, .trip: break  // later tasks give these their own animation
+    }
+  }
+}

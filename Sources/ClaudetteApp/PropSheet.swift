@@ -25,6 +25,17 @@ enum PropSheet {
         node.position = CGPoint(x: 70 + 140 * CGFloat(i), y: CGFloat(row) * size.height + 130)
         scene.addChild(node)
       }
+      // Terminal items (1.3x, the start of the command on the screen): running, then done.
+      for (i, caption) in [nil, "done"].enumerated() {
+        let item = ItemNode(
+          id: ItemID.tool(useID: "t\(i)"), scene: .shell(long: false, background: false),
+          display: 0, privacy: false, uiScale: 1)
+        item.restyle(
+          .shell(long: false, background: false), caption: caption, command: "npm run build --watch"
+        )
+        item.position = CGPoint(x: 70 + 140 * CGFloat(i), y: CGFloat(row) * size.height + 50)
+        scene.addChild(item)
+      }
     }
     let view = SKView(frame: CGRect(origin: .zero, size: scene.size))
     guard let texture = view.texture(from: scene) else { return false }

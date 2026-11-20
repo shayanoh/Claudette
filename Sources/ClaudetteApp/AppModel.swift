@@ -101,10 +101,15 @@ final class AppModel {
     "err-billing", "err-limit", "recover", "compact", "done", "context",
   ]
 
+  private var debugToolCount = 0
+
   func simulateScene(_ name: String) {
     let s = "\"session_id\":\"debug-1\""
     func pre(_ tool: String, _ id: String, _ input: String) -> String {
-      "{\"hook_event_name\":\"PreToolUse\",\(s),\"tool_name\":\"\(tool)\",\"tool_use_id\":\"\(id)\",\"tool_input\":\(input)}"
+      // A fresh tool_use_id each time, so repeating a scene is a new tool call on the same item.
+      debugToolCount += 1
+      return
+        "{\"hook_event_name\":\"PreToolUse\",\(s),\"tool_name\":\"\(tool)\",\"tool_use_id\":\"\(id)-\(debugToolCount)\",\"tool_input\":\(input)}"
     }
     func ev(_ n: String, _ extra: String = "") -> String {
       "{\"hook_event_name\":\"\(n)\",\(s)\(extra.isEmpty ? "" : "," + extra)}"

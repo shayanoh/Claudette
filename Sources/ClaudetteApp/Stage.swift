@@ -14,7 +14,8 @@ final class Actor {
   var visible = true
   var placedOnce = false
   var minis: [String: PuppetNode] = [:]
-  var props: [(id: String, node: PropNode)] = []
+  /// What she is heading to or working on (lets a dragged item re-target her).
+  var task: (item: ItemID, move: Move)?
   var lastPhase: SessionPhase = .idle
   var isDodging = false
   var lastDodge = Date.distantPast
@@ -43,9 +44,11 @@ final class Stage {
 
   private func updateFrameRate() {
     let busy =
-      Date().timeIntervalSince(lastActivity) < 3 || dragging != nil
+      Date().timeIntervalSince(lastActivity) < 3 || dragging != nil || draggingOther != nil
       || actors.values.contains {
-        !$0.props.isEmpty || $0.lastPhase != .idle && $0.lastPhase != .sleeping
+        $0.puppet.action(forKey: "brain") != nil
+          || $0.lastPhase != .idle
+            && $0.lastPhase != .sleeping
       }
     let fps = busy ? Stage.activeFPS : Stage.idleFPS
     guard fps != currentFPS else { return }
@@ -53,8 +56,8 @@ final class Stage {
     overlay.setFrameRate(fps)
   }
 
-  private let overlay: OverlayController
-  private let settings: SettingsStore
+  let overlay: OverlayController
+  let settings: SettingsStore
   private(set) var actors: [String: Actor] = [:]
   private var nextOrder = 0
   private var lastPointer = CGPoint.zero
@@ -73,6 +76,7 @@ final class Stage {
   private var lastDragPoint = CGPoint.zero
 
   private var timer: Timer?
+  private(set) lazy var world = World(stage: self)
 
   init(overlay: OverlayController, settings: SettingsStore) {
     self.overlay = overlay
@@ -94,20 +98,20 @@ final class Stage {
 
   // MARK: - Geometry helpers
 
-  private var scale: CGFloat { CGFloat(settings.settings.scale) }
+  var scale: CGFloat { CGFloat(settings.settings.scale) }
   private var spriteSize: CGSize {
     CGSize(width: PuppetNode.hitBounds.width * scale, height: PuppetNode.hitBounds.height * scale)
   }
 
-  private func screen(_ display: CGDirectDisplayID) -> NSScreen? {
+  func screen(_ display: CGDirectDisplayID) -> NSScreen? {
     NSScreen.screens.first { OverlayController.displayID(of: $0) == display }
   }
 
-  private var screenFrames: [CGRect] { NSScreen.screens.map(\.frame) }
+  var screenFrames: [CGRect] { NSScreen.screens.map(\.frame) }
 
   private func rect(_ a: Actor) -> CGRect { CGRect(origin: a.origin, size: spriteSize) }
 
-  private func display(at point: CGPoint) -> CGDirectDisplayID? {
+  func display(at point: CGPoint) -> CGDirectDisplayID? {
     for s in NSScreen.screens where s.frame.contains(point) {
       return OverlayController.displayID(of: s)
     }
@@ -115,7 +119,7 @@ final class Stage {
   }
 
   /// Puppet position (feet centre) in its display's scene coordinates.
-  private func scenePosition(_ a: Actor) -> CGPoint {
+  func scenePosition(_ a: Actor) -> CGPoint {
     let f = screen(a.display)?.frame ?? .zero
     return CGPoint(
       x: a.origin.x - f.minX - PuppetNode.hitBounds.minX * scale,
@@ -129,13 +133,18 @@ final class Stage {
     for change in changes {
       switch change {
       case .started(let id): addActor(id)
-      case .ended(let id): removeActor(id)
+      case .ended(let id):
+        removeActor(id)
+        world.sessionEnded(id)
       case .phaseChanged(let id, let phase): phaseChanged(id, phase)
       case .subagentStarted(let id, let agent): addMini(id, agent)
       case .subagentStopped(let id, let agent): removeMini(id, agent)
-      case .toolStarted(let id, let tool): addProp(id, tool)
-      case .toolFinished(let id, let toolID, let ok): removeProp(id, toolID, success: ok)
-      case .longShell(let id, let toolID): upgradeShell(id, toolID)
+      case .toolStarted(let id, let tool):
+        world.toolStarted(session: id, tool: tool, cwd: sessions[id]?.cwd)
+      case .toolFinished(let id, _, let ok): if !ok { shake(id) }
+      case .toolResult(_, let toolID, let result):
+        world.toolResult(toolUseID: toolID, result: result)
+      case .longShell(_, let toolID): world.longShell(toolUseID: toolID)
       case .skillLoaded(let id, let name):
         actors[id]?.puppet.rune(settings.settings.privacyMode ? "•••" : name)
       case .compacted(let id): actors[id]?.puppet.compact()
@@ -203,58 +212,34 @@ final class Stage {
     return false
   }
 
-  // MARK: Props
-
-  private static let propSlots: [CGPoint] = [
-    CGPoint(x: -150, y: 70), CGPoint(x: -168, y: 12), CGPoint(x: -150, y: 128),
-    CGPoint(x: -214, y: 50),
-  ]
-
-  private func addProp(_ id: String, _ tool: ToolActivity) {
-    guard let a = actors[id], !a.props.contains(where: { $0.id == tool.toolUseID }) else { return }
-    let scene = SceneMapper.scene(for: tool, now: Date())
-    if scene == .subagent { return }
-    let node = PropNode(scene: scene, privacy: settings.settings.privacyMode)
-    node.setScale(0.01)
-    a.puppet.addChild(node)
-    a.props.append((tool.toolUseID, node))
-    layoutProps(a)
-    node.run(.scale(to: 1, duration: 0.25))
+  /// A failed tool call makes her flinch sideways.
+  private func shake(_ id: String) {
+    actors[id]?.puppet.run(
+      .sequence([
+        .moveBy(x: 4, y: 0, duration: 0.05), .moveBy(x: -8, y: 0, duration: 0.1),
+        .moveBy(x: 4, y: 0, duration: 0.05),
+      ]), withKey: "shake")
   }
 
-  private func removeProp(_ id: String, _ toolID: String, success: Bool) {
-    guard let a = actors[id], let i = a.props.firstIndex(where: { $0.id == toolID }) else { return }
-    let node = a.props.remove(at: i).node
-    node.run(.sequence([.scale(to: 0.01, duration: 0.2), .removeFromParent()]))
-    if !success {
-      a.puppet.run(
-        .sequence([
-          .moveBy(x: 4, y: 0, duration: 0.05), .moveBy(x: -8, y: 0, duration: 0.1),
-          .moveBy(x: 4, y: 0, duration: 0.05),
-        ]))
+  // MARK: Position in the world
+
+  /// Where her feet are, in global screen coordinates (what the brain plans in).
+  func feet(of a: Actor) -> CGPoint {
+    CGPoint(
+      x: a.origin.x - PuppetNode.hitBounds.minX * scale,
+      y: a.origin.y - PuppetNode.hitBounds.minY * scale)
+  }
+
+  /// Puts her feet at `p` right now (the walk calls this every frame).
+  func setFeet(_ a: Actor, _ p: CGPoint) {
+    guard p.x.isFinite, p.y.isFinite else { return }
+    a.origin = CGPoint(
+      x: p.x + PuppetNode.hitBounds.minX * scale, y: p.y + PuppetNode.hitBounds.minY * scale)
+    if let d = display(at: p), d != a.display {
+      a.display = d
+      applyDisplayParent(a)
     }
-    layoutProps(a)
-  }
-
-  private func upgradeShell(_ id: String, _ toolID: String) {
-    guard let a = actors[id], let i = a.props.firstIndex(where: { $0.id == toolID }) else { return }
-    let old = a.props[i].node
-    let node = PropNode(
-      scene: .shell(long: true, background: false), privacy: settings.settings.privacyMode)
-    node.position = old.position
-    a.puppet.addChild(node)
-    old.removeFromParent()
-    a.props[i] = (toolID, node)
-    layoutProps(a)
-  }
-
-  /// Props stand beside her, newest nearest; more activity means a busier, more cluttered Claudette.
-  private func layoutProps(_ a: Actor) {
-    for (i, entry) in a.props.suffix(Self.propSlots.count).reversed().enumerated() {
-      let target = Self.propSlots[i]
-      entry.node.run(.move(to: target, duration: 0.25))
-      entry.node.setCableEnd(CGPoint(x: 80 - target.x, y: 50 - target.y))
-    }
+    a.puppet.position = scenePosition(a)
   }
 
   private func addMini(_ id: String, _ agent: String) {
@@ -279,6 +264,7 @@ final class Stage {
 
   func settingsChanged() {
     actors.values.forEach { $0.puppet.setScale(scale) }
+    world.applyScale()
     overlay.focusHidden = settings.settings.focusMode
     relayout()
   }
@@ -448,7 +434,7 @@ final class Stage {
       .sequence([move, .run { [weak a] in a?.isDodging = false }]), withKey: "move")
   }
 
-  private func applyDisplayParent(_ a: Actor) {
+  func applyDisplayParent(_ a: Actor) {
     guard let scene = overlay.overlays[a.display]?.scene, a.puppet.scene !== scene else { return }
     a.puppet.removeFromParent()
     a.puppet.position = scenePosition(a)
