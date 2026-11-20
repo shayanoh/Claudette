@@ -6,8 +6,12 @@ import SpriteKit
 /// cartridge with a cable for MCP, ...). Final art replaces these in the art plan.
 final class PropNode: SKNode {
   let toolScene: ToolScene
-  private let cable = SKShapeNode()
-  private let body = SKNode()
+  let cable = SKShapeNode()
+  /// Coloured core of the MCP cable (art mode); `cable` is then its ink outline.
+  let cableCore = SKShapeNode()
+  /// Connector plug at the cable's end (art mode).
+  var plug: SKSpriteNode?
+  let body = SKNode()
 
   init(scene: ToolScene, privacy: Bool) {
     toolScene = scene
@@ -15,8 +19,11 @@ final class PropNode: SKNode {
     cable.strokeColor = Palette.ink
     cable.lineWidth = 3
     cable.zPosition = -1
+    cableCore.strokeColor = .clear
     addChild(cable)
+    addChild(cableCore)
     addChild(body)
+    if let lib = ArtLibrary.shared, buildArt(scene, privacy: privacy, lib: lib) { return }
     build(scene, privacy: privacy)
   }
 
@@ -29,6 +36,13 @@ final class PropNode: SKNode {
     p.move(to: .zero)
     p.addQuadCurve(to: target, control: CGPoint(x: target.x * 0.4, y: -28))
     cable.path = p
+    cableCore.path = p
+    if let plug {
+      // Aim the plug along the curve's end tangent (control point to target).
+      let c = CGPoint(x: target.x * 0.4, y: -28)
+      plug.position = target
+      plug.zRotation = atan2(target.y - c.y, target.x - c.x) + .pi
+    }
   }
 
   private func shape(_ rect: CGRect, radius: CGFloat = 4, fill: NSColor, stroke: Bool = true)
@@ -41,7 +55,7 @@ final class PropNode: SKNode {
     return n
   }
 
-  private func label(_ text: String, y: CGFloat = -34, size: CGFloat = 10) {
+  func label(_ text: String, y: CGFloat = -34, size: CGFloat = 10) {
     let l = SKLabelNode(text: text)
     l.fontName = "AvenirNext-DemiBold"
     l.fontSize = size
@@ -63,7 +77,7 @@ final class PropNode: SKNode {
     s.count > n ? String(s.prefix(n - 1)) + "…" : s
   }
 
-  private func name(_ s: String?, _ privacy: Bool) -> String {
+  func name(_ s: String?, _ privacy: Bool) -> String {
     guard let s, !s.isEmpty else { return "" }
     return privacy ? "•••" : Self.shorten(s)
   }

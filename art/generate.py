@@ -13,6 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True  # keep art/src free of __pycache__
 sys.path.insert(0, os.path.join(HERE, "src"))
 import parts as P  # noqa: E402
+import props as R  # noqa: E402
 
 BUILD = os.path.join(HERE, "build")
 EXPORT = os.path.join(HERE, "export")
@@ -60,17 +61,57 @@ VARIANTS = {
 }
 
 
-def canvas(box, flush_bottom=False):
+def canvas(box, flush_bottom=False, flush_left=False):
     """Snap the drawn extent outward to whole points so pixel sizes are exact."""
     x0, y0, x1, y1 = box
     # Symmetric about the pivot in x where the art is, so anchors stay exactly 0.5.
-    x0, y0, x1 = math.floor(x0 - MARGIN), math.floor(y0 - MARGIN), math.ceil(x1 + MARGIN)
+    y0, x1 = math.floor(y0 - MARGIN), math.ceil(x1 + MARGIN)
+    if flush_left:
+        assert x0 >= 0, box
+        x0 = 0
+    else:
+        x0 = math.floor(x0 - MARGIN)
     if flush_bottom:
         assert y1 <= 0, box
         y1 = 0
     else:
         y1 = math.ceil(y1 + MARGIN)
     return x0, y0, x1 - x0, y1 - y0
+
+
+# Tool props: top-level, no parent/position/z. kind: "centre" = anchor [0.5,0.5] on the
+# visual centre, "tip" = [0.5,0] (pencil tip), "plug" = [0,0.5] (cable end).
+LABEL = True
+PROPS = {
+    "prop_read": (R.prop_read, "centre", LABEL, False),
+    "prop_search": (R.prop_search, "centre", False, False),
+    "prop_edit": (R.prop_edit, "centre", LABEL, False),
+    "prop_edit_pencil": (R.prop_edit_pencil, "tip", False, False),
+    "prop_write": (R.prop_write, "centre", LABEL, False),
+    "prop_shell": (R.prop_shell, "centre", LABEL, False),
+    "prop_shell_long": (R.prop_shell_long, "centre", LABEL, False),
+    "prop_shell_bg": (R.prop_shell_bg, "centre", LABEL, False),
+    "prop_web": (R.prop_web, "centre", LABEL, False),
+    "prop_skill": (R.prop_skill, "centre", LABEL, False),
+    "prop_todo": (R.prop_todo, "centre", LABEL, False),
+    "prop_plan": (R.prop_plan, "centre", LABEL, False),
+    "prop_other": (R.prop_other, "centre", LABEL, False),
+    **{f"prop_mcp_{n}": (getattr(R, f"prop_mcp_{n}"), "centre", LABEL, True)
+       for n in ("generic", "github", "playwright", "figma", "context7")},
+    "prop_mcp_cable": (R.prop_mcp_cable, "plug", False, True),
+}
+
+
+def symmetric(box, kind):
+    """Make the extent symmetric about the pivot on every centred axis."""
+    x0, y0, x1, y1 = box
+    if kind != "plug":
+        m = max(-x0, x1)
+        x0, x1 = -m, m
+    if kind != "tip":
+        m = max(-y0, y1)
+        y0, y1 = -m, m
+    return x0, y0, x1, y1
 
 
 def union(a, b):
@@ -135,6 +176,20 @@ def export():
             if parent:
                 a.update(parent=parent, position=list(pos))
         assets[name] = a
+    for name, (draw, kind, label, tint) in PROPS.items():
+        frag, box = draw()
+        x0, y0, w, h = canvas(symmetric(box, kind), kind == "tip", kind == "plug")
+        svg = os.path.join(BUILD, f"{name}.svg")
+        write(svg, svg_doc(frag, x0, y0, w, h))
+        rasterise(svg, os.path.join(EXPORT, file_name(name)), w * SCALE, h * SCALE)
+        anchor = [round(-x0 / w, 6), round((y0 + h) / h, 6)]
+        assert anchor == {"centre": [0.5, 0.5], "tip": [0.5, 0.0], "plug": [0.0, 0.5]}[kind], (name, anchor)
+        a = dict(file=file_name(name), size=[w, h], anchor=anchor)
+        if label:
+            a["label"] = [0, -(h / 2 + 5)]
+        if tint:
+            a["tint"] = True
+        assets[name] = a
     for name, (base, _d) in VARIANTS.items():
         assert (assets[name]["size"], assets[name]["anchor"]) == (assets[base]["size"], assets[base]["anchor"]), name
     manifest = {"version": 1, "scale": SCALE, "assets": assets}
@@ -183,6 +238,7 @@ def figure(assets, uris, names, cx, ground, k, swap=None):
     return "".join(s for *_k, s in sorted(placed))
 
 
+TINTS = ["#7FC8F8", "#FFC94D", "#E5484D"]  # sample runtime tints for the cartridge check
 LEVEL = {"bag_fill": 0.55, "jar_fill": 0.6}  # sheet preview of the fill levels
 CHARACTER = [n for n in PARTS if n not in ("jar_glass", "jar_fill", "jar_lid", "moon_dark", "moon_lit")]
 POSES = [  # (hidden parts, swaps)
@@ -206,7 +262,13 @@ def sheet(manifest):
     W = cols * cell + 2 * pad
     fig_h, pose_h = 360, 200
     ch = cell // 2
-    H = pad + fig_h + pad + pose_h + pad + rows * (ch + 40) + pad
+    prop_cols, prop_cell, pk = 7, (W - 2 * pad) // 7, 2.0
+    prop_rows = math.ceil(len(PROPS) / prop_cols)
+    tints = [n for n in PROPS if PROPS[n][3]]
+    tint_cols, tint_cell = 9, (W - 2 * pad) // 9
+    tint_rows = math.ceil(len(tints) * len(TINTS) / tint_cols)
+    props_h = prop_rows * 2 * prop_cell + tint_rows * tint_cell
+    H = pad + fig_h + pad + pose_h + pad + props_h + pad + rows * (ch + 40) + pad
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">',
          '<defs>'
          '<pattern id="lc" width="16" height="16" patternUnits="userSpaceOnUse">'
@@ -236,6 +298,43 @@ def sheet(manifest):
         o.append(figure(assets, uris, [n for n in CHARACTER if n not in hide],
                         pad + step * (i + 0.5), y + pose_h - 25, 0.9, swap))
     y += pose_h + pad
+    # Props at 2x, each row on light then dark, with the label slot shown as a grey bar.
+    def put(name, cx, cy, k, extra=""):
+        a = assets[name]
+        w, h = a["size"]
+        left, top = cx - a["anchor"][0] * w * k, cy - (1 - a["anchor"][1]) * h * k
+        return image(a, uris[name], left, top, k).replace("<image ", f"<image {extra} ")
+    for r in range(prop_rows):
+        row = list(PROPS)[r * prop_cols:(r + 1) * prop_cols]
+        for j, bg in enumerate(("#F4F4F6", "#2A2F45")):
+            ry = y + (2 * r + j) * prop_cell
+            o.append(f'<rect x="{pad}" y="{ry}" width="{W-2*pad}" height="{prop_cell}" fill="{bg}"/>')
+            for i, name in enumerate(row):
+                a = assets[name]
+                cx = pad + (i + 0.5) * prop_cell
+                cy = ry + prop_cell / 2 - (8 if a.get("label") else 0)
+                if PROPS[name][1] != "centre":  # tip/plug pivots: centre the sprite in the cell
+                    w, h = a["size"]
+                    cx += (a["anchor"][0] - 0.5) * w * pk
+                    cy += (0.5 - a["anchor"][1]) * h * pk
+                o.append(put(name, cx, cy, pk))
+                if a.get("label"):
+                    lx, ly = cx + a["label"][0] * pk, cy - a["label"][1] * pk
+                    o.append(f'<rect x="{lx-18}" y="{ly-4}" width="36" height="8" rx="4" fill="#8A8FA3"/>')
+    y += prop_rows * 2 * prop_cell
+    # Tint check: SpriteKit colorBlendFactor 1 multiplies the texture by the colour.
+    o.append("<defs>" + "".join(
+        f'<filter id="t{i}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="'
+        f'{int(c[1:3],16)/255:.3f} 0 0 0 0 0 {int(c[3:5],16)/255:.3f} 0 0 0 0 0 {int(c[5:7],16)/255:.3f} 0 0 0 0 0 1 0"/></filter>'
+        for i, c in enumerate(TINTS)) + "</defs>")
+    o.append(f'<rect x="{pad}" y="{y}" width="{W-2*pad}" height="{tint_rows*tint_cell}" fill="#E3E6F0"/>')
+    for i, (name, t) in enumerate((n, t) for n in tints for t in range(len(TINTS))):
+        cx = pad + (i % tint_cols + 0.5) * tint_cell
+        cy = y + (i // tint_cols + 0.5) * tint_cell
+        if PROPS[name][1] == "plug":
+            cx -= assets[name]["size"][0] * pk / 2
+        o.append(put(name, cx, cy, pk, f'filter="url(#t{t})"'))
+    y += tint_rows * tint_cell + pad
     for i, name in enumerate(names):
         cx0 = pad + (i % cols) * cell
         cy0 = y + (i // cols) * (ch + 40)
@@ -254,7 +353,7 @@ def sheet(manifest):
     o.append("</svg>\n")
     svg = os.path.join(BUILD, "sheet.svg")
     write(svg, "".join(o))
-    rasterise(svg, os.path.join(EXPORT, "sheet.png"), W * SCALE, H * SCALE)
+    rasterise(svg, os.path.join(EXPORT, "sheet.png"), int(W * SCALE), int(H * SCALE))
 
 
 if __name__ == "__main__":

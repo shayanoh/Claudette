@@ -512,6 +512,285 @@
       ],
       "variantOf": "mouth"
     },
+    "prop_edit": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_edit.png",
+      "label": [
+        0,
+        -27.0
+      ],
+      "size": [
+        36,
+        44
+      ]
+    },
+    "prop_edit_pencil": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "prop_edit_pencil.png",
+      "size": [
+        14,
+        37
+      ]
+    },
+    "prop_mcp_cable": {
+      "anchor": [
+        0.0,
+        0.5
+      ],
+      "file": "prop_mcp_cable.png",
+      "size": [
+        19,
+        16
+      ],
+      "tint": true
+    },
+    "prop_mcp_context7": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_mcp_context7.png",
+      "label": [
+        0,
+        -27.0
+      ],
+      "size": [
+        38,
+        44
+      ],
+      "tint": true
+    },
+    "prop_mcp_figma": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_mcp_figma.png",
+      "label": [
+        0,
+        -27.0
+      ],
+      "size": [
+        38,
+        44
+      ],
+      "tint": true
+    },
+    "prop_mcp_generic": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_mcp_generic.png",
+      "label": [
+        0,
+        -27.0
+      ],
+      "size": [
+        38,
+        44
+      ],
+      "tint": true
+    },
+    "prop_mcp_github": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_mcp_github.png",
+      "label": [
+        0,
+        -27.0
+      ],
+      "size": [
+        38,
+        44
+      ],
+      "tint": true
+    },
+    "prop_mcp_playwright": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_mcp_playwright.png",
+      "label": [
+        0,
+        -27.0
+      ],
+      "size": [
+        38,
+        44
+      ],
+      "tint": true
+    },
+    "prop_other": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_other.png",
+      "label": [
+        0,
+        -25.0
+      ],
+      "size": [
+        40,
+        40
+      ]
+    },
+    "prop_plan": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_plan.png",
+      "label": [
+        0,
+        -23.0
+      ],
+      "size": [
+        44,
+        36
+      ]
+    },
+    "prop_read": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_read.png",
+      "label": [
+        0,
+        -27.0
+      ],
+      "size": [
+        36,
+        44
+      ]
+    },
+    "prop_search": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_search.png",
+      "size": [
+        44,
+        42
+      ]
+    },
+    "prop_shell": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_shell.png",
+      "label": [
+        0,
+        -22.0
+      ],
+      "size": [
+        48,
+        34
+      ]
+    },
+    "prop_shell_bg": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_shell_bg.png",
+      "label": [
+        0,
+        -27.0
+      ],
+      "size": [
+        54,
+        44
+      ]
+    },
+    "prop_shell_long": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_shell_long.png",
+      "label": [
+        0,
+        -30.0
+      ],
+      "size": [
+        50,
+        50
+      ]
+    },
+    "prop_skill": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_skill.png",
+      "label": [
+        0,
+        -35.0
+      ],
+      "size": [
+        52,
+        60
+      ]
+    },
+    "prop_todo": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_todo.png",
+      "label": [
+        0,
+        -29.0
+      ],
+      "size": [
+        36,
+        48
+      ]
+    },
+    "prop_web": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_web.png",
+      "label": [
+        0,
+        -22.0
+      ],
+      "size": [
+        44,
+        34
+      ]
+    },
+    "prop_write": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "prop_write.png",
+      "label": [
+        0,
+        -27.0
+      ],
+      "size": [
+        36,
+        44
+      ]
+    },
     "shadow": {
       "anchor": [
         0.5,
