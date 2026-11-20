@@ -14,6 +14,8 @@ final class Actor {
   var visible = true
   var placedOnce = false
   var minis: [String: PuppetNode] = [:]
+  var props: [(id: String, node: PropNode)] = []
+  var lastPhase: SessionPhase = .idle
   var isDodging = false
   var lastDodge = Date.distantPast
   var dodgedAt: Date?
@@ -97,7 +99,7 @@ final class Stage {
 
   // MARK: - Sessions
 
-  func apply(_ changes: [SessionChange]) {
+  func apply(_ changes: [SessionChange], sessions: [String: SessionState] = [:]) {
     for change in changes {
       switch change {
       case .started(let id): addActor(id)
@@ -105,8 +107,18 @@ final class Stage {
       case .phaseChanged(let id, let phase): phaseChanged(id, phase)
       case .subagentStarted(let id, let agent): addMini(id, agent)
       case .subagentStopped(let id, let agent): removeMini(id, agent)
-      default: break  // scenes for tools, errors, skills arrive in later tasks
+      case .toolStarted(let id, let tool): addProp(id, tool)
+      case .toolFinished(let id, let toolID, let ok): removeProp(id, toolID, success: ok)
+      case .longShell(let id, let toolID): upgradeShell(id, toolID)
+      case .skillLoaded(let id, let name):
+        actors[id]?.puppet.rune(settings.settings.privacyMode ? "•••" : name)
+      case .compacted(let id): actors[id]?.puppet.compact()
+      default: break
       }
+    }
+    for (id, state) in sessions {
+      actors[id]?.puppet.setContext(
+        state.contextUsedPercentage, privacy: settings.settings.privacyMode)
     }
     updatePause()
   }
@@ -147,13 +159,76 @@ final class Stage {
     } else if a.puppet.isAsleep {
       a.puppet.idle()
     }
+    if case .error = a.lastPhase, !isError(phase) { a.puppet.relief() }
+    a.lastPhase = phase
+    a.puppet.setStatus(phase)
+  }
+
+  private func isError(_ phase: SessionPhase) -> Bool {
+    if case .error = phase { return true }
+    return false
+  }
+
+  // MARK: Props
+
+  private static let propSlots: [CGPoint] = [
+    CGPoint(x: -150, y: 70), CGPoint(x: -168, y: 12), CGPoint(x: -150, y: 128),
+    CGPoint(x: -214, y: 50),
+  ]
+
+  private func addProp(_ id: String, _ tool: ToolActivity) {
+    guard let a = actors[id], !a.props.contains(where: { $0.id == tool.toolUseID }) else { return }
+    let scene = SceneMapper.scene(for: tool, now: Date())
+    if scene == .subagent { return }
+    let node = PropNode(scene: scene, privacy: settings.settings.privacyMode)
+    node.setScale(0.01)
+    a.puppet.addChild(node)
+    a.props.append((tool.toolUseID, node))
+    layoutProps(a)
+    node.run(.scale(to: 1, duration: 0.25))
+  }
+
+  private func removeProp(_ id: String, _ toolID: String, success: Bool) {
+    guard let a = actors[id], let i = a.props.firstIndex(where: { $0.id == toolID }) else { return }
+    let node = a.props.remove(at: i).node
+    node.run(.sequence([.scale(to: 0.01, duration: 0.2), .removeFromParent()]))
+    if !success {
+      a.puppet.run(
+        .sequence([
+          .moveBy(x: 4, y: 0, duration: 0.05), .moveBy(x: -8, y: 0, duration: 0.1),
+          .moveBy(x: 4, y: 0, duration: 0.05),
+        ]))
+    }
+    layoutProps(a)
+  }
+
+  private func upgradeShell(_ id: String, _ toolID: String) {
+    guard let a = actors[id], let i = a.props.firstIndex(where: { $0.id == toolID }) else { return }
+    let old = a.props[i].node
+    let node = PropNode(
+      scene: .shell(long: true, background: false), privacy: settings.settings.privacyMode)
+    node.position = old.position
+    a.puppet.addChild(node)
+    old.removeFromParent()
+    a.props[i] = (toolID, node)
+    layoutProps(a)
+  }
+
+  /// Props stand beside her, newest nearest; more activity means a busier, more cluttered Claudette.
+  private func layoutProps(_ a: Actor) {
+    for (i, entry) in a.props.suffix(Self.propSlots.count).reversed().enumerated() {
+      let target = Self.propSlots[i]
+      entry.node.run(.move(to: target, duration: 0.25))
+      entry.node.setCableEnd(CGPoint(x: 80 - target.x, y: 50 - target.y))
+    }
   }
 
   private func addMini(_ id: String, _ agent: String) {
     guard let a = actors[id], a.minis[agent] == nil else { return }
     let mini = PuppetNode()
     mini.setScale(0.55)
-    mini.position = CGPoint(x: 150 + CGFloat(a.minis.count) * 120, y: 0)
+    mini.position = CGPoint(x: 70 + CGFloat(a.minis.count) * 85, y: -12)
+    mini.zPosition = 5
     a.puppet.addChild(mini)
     a.minis[agent] = mini
     mini.wake()

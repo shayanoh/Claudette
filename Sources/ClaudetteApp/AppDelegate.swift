@@ -23,6 +23,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       i.target = self
       menu.addItem(i)
     }
+    let scn = NSMenuItem(title: "Debug: simulate scene", action: nil, keyEquivalent: "")
+    let scnMenu = NSMenu()
+    for name in AppModel.scenes {
+      let i = NSMenuItem(title: name, action: #selector(simulateScene(_:)), keyEquivalent: "")
+      i.target = self
+      scnMenu.addItem(i)
+    }
+    scn.submenu = scnMenu
+    menu.addItem(scn)
     let sim = NSMenuItem(title: "Debug: simulate limits", action: nil, keyEquivalent: "")
     let simMenu = NSMenu()
     for (title, tag) in [
@@ -49,6 +58,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     if let n = ProcessInfo.processInfo.environment["CLAUDETTE_DEBUG_SPAWN"], let count = Int(n) {
       for _ in 0..<max(0, min(count, 12)) { debugAdd() }
     }
+    if let seq = ProcessInfo.processInfo.environment["CLAUDETTE_DEBUG_SCENES"] {
+      // e.g. "read,shell,mcp": one scene every 0.8 seconds starting after 2 seconds
+      for (i, name) in seq.split(separator: ",").enumerated() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2 + Double(i) * 0.8) { [weak self] in
+          self?.model.simulateScene(String(name))
+        }
+      }
+    }
     if let seq = ProcessInfo.processInfo.environment["CLAUDETTE_DEBUG_LIMITS"] {
       // e.g. "fresh,low,limit,lifted": one step every 4 seconds starting after 2 seconds
       for (i, step) in seq.split(separator: ",").enumerated() {
@@ -67,6 +84,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
     }
   }
+
+  @objc private func simulateScene(_ sender: NSMenuItem) { model.simulateScene(sender.title) }
 
   @objc private func simulate(_ sender: NSMenuItem) {
     switch sender.tag {

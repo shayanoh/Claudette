@@ -41,3 +41,9 @@ Headless (`-p`) mode only so far; interactive-only behaviour is listed under "No
 - `SceneMapper`: treat tool name `Agent` as the sub-agent scene (the plan said `Task`).
 - Skill scene: `tool_name == "Skill"`, name from `tool_input.skill`.
 - `SessionStore` must not rely on `SessionStart`.
+
+## Known gaps (Task 14)
+
+- **Pure network disconnects** are not reported by any hook we have seen; only API errors that end a turn
+  (`StopFailure` with `server_error` etc.) are. The "offline" error kind exists in the UI but nothing emits it yet.
+- Scenes for `Task`/`TaskCreated`/`TaskCompleted` events and per-model outfits are not drawn yet.
