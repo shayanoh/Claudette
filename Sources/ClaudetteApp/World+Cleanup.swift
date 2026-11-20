@@ -100,11 +100,17 @@ extension World {
       a.puppet.setWalking(false)
       a.task = nil
       a.wandering = false
+      if a.perch != nil {  // she hops off her window to help
+        a.perch = nil
+        a.puppet.setPose(.stand)
+      }
     }
     // The can goes on the display holding most of the clutter, at the edge nearest to it.
+    let live = Set(stage.overlay.overlays.keys)
     let display =
-      Dictionary(grouping: items, by: { $0.display ?? 0 }).max { $0.value.count < $1.value.count }?
-      .key ?? crew[0].display
+      Dictionary(grouping: items.filter { live.contains($0.display ?? 0) }, by: { $0.display ?? 0 })
+      .max { $0.value.count < $1.value.count }?.key
+      ?? (live.contains(crew[0].display) ? crew[0].display : live.first ?? crew[0].display)
     let frame = stage.screen(display)?.visibleFrame ?? stage.screenFrames.first ?? .zero
     let meanX = items.compactMap(\.position).map(\.x).reduce(0, +) / CGFloat(max(1, items.count))
     let right = meanX > frame.midX
@@ -223,6 +229,7 @@ extension World {
 
   private func carry(_ a: Actor, _ id: ItemID) {
     guard let node = nodes[id], !a.armful.contains(where: { $0 === node }) else { return }
+    detachFromHolders(node, except: a)
     node.removeAllActions()
     node.pointerExited()
     stage.draggables.removeAll { $0 === node }
@@ -254,6 +261,11 @@ extension World {
 
   /// An item is back on the screen as an ordinary, draggable one at `center`.
   private func landed(_ node: ItemNode, at center: CGPoint) {
+    // Trashed or evicted while in the air: it must not come back as an invisible, click-eating item.
+    guard nodes[node.itemID] === node else {
+      node.removeFromParent()
+      return
+    }
     node.zPosition = 0
     stage.draggables.append(node)
     let settled = settle(node, at: center)
@@ -335,12 +347,14 @@ extension World {
     updateArms(a)
     run.remaining -= 1
     if run.remaining <= 0 { finish(run) }
+    DispatchQueue.main.async { [weak self, weak a] in if let self, let a { self.brainEnded(a) } }
   }
 
   private func finish(_ run: CleanupRun) {
-    run.can.slideOut(toward: run.edgeX) { [weak run] in
-      let done = run?.completion
-      run?.completion = nil
+    // Strong capture on purpose: the last crew member may be the only thing keeping the run alive.
+    run.can.slideOut(toward: run.edgeX) {
+      let done = run.completion
+      run.completion = nil
       done?()
     }
   }

@@ -63,10 +63,33 @@ final class World {
     let intents = brain.plan(
       event: .thinkingChanged(true), actor: brainActor(a), world: model.all,
       screens: stage.screenFrames, rng: &rng)
-    run(intents, for: a, wandering: true) { [weak self, weak a] in
-      guard let self, let a else { return }
-      a.wandering = false
-      self.startWander(a)
+    run(intents, for: a, wandering: true)
+  }
+
+  /// A brain sequence has finished (checked one turn later, when SpriteKit has dropped the action):
+  /// keep pacing while Claude still thinks, or tidy up if the session is waiting and messy.
+  func brainEnded(_ a: Actor) {
+    guard a.parent == nil, a.cleaning == nil, a.puppet.action(forKey: "brain") == nil,
+      stage.actors[a.sessionID] === a
+    else { return }
+    if a.thinking {
+      startWander(a)
+    } else {
+      phaseChanged(session: a.sessionID, phase: a.lastPhase)
+    }
+  }
+
+  /// She was grabbed or is stepping aside: whatever she was doing stops (a cleanup she was on is
+  /// given up cleanly, dropping what she carries).
+  func interrupt(_ a: Actor) {
+    cancelCleanup(a)
+    a.puppet.removeAction(forKey: "brain")
+    a.puppet.setWalking(false)
+    a.wandering = false
+    a.task = nil
+    if a.perch != nil {
+      a.perch = nil
+      a.puppet.setPose(.stand)
     }
   }
 
@@ -74,7 +97,8 @@ final class World {
   func tickSubs() {
     let now = Date()
     for parent in stage.actors.values {
-      for sub in parent.subs.values where sub.puppet.action(forKey: "brain") == nil {
+      for sub in parent.subs.values
+      where sub.puppet.action(forKey: "brain") == nil && sub.cleaning == nil {
         guard now >= sub.nextRoam else { continue }
         sub.nextRoam = now.addingTimeInterval(.random(in: 2.5...6, using: &rng))
         let outside =
@@ -102,7 +126,9 @@ final class World {
   /// window's top edge; one that is sitting there gets the shock of her life if the window moves.
   func tickPerch() {
     guard stage.settings.settings.perchEnabled, !stage.reduceMotion else { return }
-    let candidates = stage.actors.values.filter { $0.perch != nil || $0.wandering }
+    let candidates = stage.actors.values.filter {
+      $0.cleaning == nil && ($0.perch != nil || $0.wandering)
+    }
     guard !candidates.isEmpty else { return }
     windows = WindowTracker.poll()
     for a in candidates {
@@ -161,6 +187,7 @@ final class World {
   /// She takes the item into her hands (it rides along if she dodges) until she tosses or sets it down.
   private func pickUp(_ a: Actor, _ id: ItemID) {
     guard a.held == nil, let node = nodes[id] else { return }
+    detachFromHolders(node, except: a)
     node.removeAllActions()
     node.pointerExited()
     stage.draggables.removeAll { $0 === node }
@@ -173,11 +200,32 @@ final class World {
     updateArms(a)
   }
 
+  /// An item node is in at most one pair of hands: take it from anybody else holding or carrying it.
+  func detachFromHolders(_ node: ItemNode, except keep: Actor? = nil) {
+    for a in stage.allActors where a !== keep {
+      var changed = false
+      if a.held === node {
+        a.held = nil
+        changed = true
+      }
+      if a.armful.contains(where: { $0 === node }) {
+        a.armful.removeAll { $0 === node }
+        changed = true
+      }
+      if changed { updateArms(a) }
+    }
+  }
+
   /// Puts what she holds on the screen at `point` (global), or beside her feet.
   func putDownHeld(_ a: Actor, at point: CGPoint? = nil) {
     guard let node = a.held else { return }
     a.held = nil
     updateArms(a)
+    // Thrown away or evicted while she held it: nothing to put down.
+    guard nodes[node.itemID] === node else {
+      node.removeFromParent()
+      return
+    }
     let feet = stage.feet(of: a)
     let spot = point ?? CGPoint(x: feet.x - 130 * stage.scale, y: feet.y + 20)
     node.removeFromParent()
@@ -193,6 +241,7 @@ final class World {
 
   /// A leaving actor sets down what she holds (nothing may be orphaned inside a removed puppet).
   func release(_ a: Actor) {
+    cancelCleanup(a)
     putDownHeld(a)
     a.puppet.removeAction(forKey: "brain")
   }
@@ -293,9 +342,31 @@ final class World {
   func remove(_ id: ItemID) {
     model.remove([id])
     guard let node = nodes.removeValue(forKey: id) else { return }
+    detachFromHolders(node)
     stage.draggables.removeAll { $0 === node }
     node.pointerExited()
     node.run(.sequence([.fadeOut(withDuration: 0.4), .removeFromParent()]))
+  }
+
+  /// Privacy mode changed: names on items already lying around are redrawn.
+  func applyPrivacy() {
+    for node in nodes.values { node.setPrivacy(privacy) }
+  }
+
+  /// A display came or went: every item is pulled back fully onto a screen that exists, and into
+  /// that screen's scene (a removed display's scene is no longer shown).
+  func relocateItems() {
+    for (id, node) in nodes where node.parent is SKScene || node.parent == nil {
+      guard let center = model.item(id)?.position else { continue }
+      let settled = settle(node, at: center)
+      let target = stage.overlay.overlays[node.display]?.scene
+      if node.parent !== target {
+        node.removeFromParent()
+        target?.addChild(node)
+      }
+      node.position = settled.scenePosition
+      model.move(id, to: settled.center, display: node.display)
+    }
   }
 
   func applyScale() {
@@ -325,11 +396,11 @@ final class World {
   /// The mouse dropped an item: keep it fully on a screen, on whichever display it landed, and send
   /// anyone heading for it to the new spot.
   private func dropped(_ node: ItemNode, at point: CGPoint) {
-    let old = node.display
     let settled = settle(node, at: point)
-    if node.display != old {
+    let target = stage.overlay.overlays[node.display]?.scene
+    if node.parent !== target {
       node.removeFromParent()
-      stage.overlay.overlays[node.display]?.scene.addChild(node)
+      target?.addChild(node)
     }
     node.position = settled.scenePosition
     model.move(node.itemID, to: settled.center, display: node.display)
@@ -350,9 +421,8 @@ final class World {
       anchor: sub.map { stage.feet(of: $0) }, leash: sub == nil ? 0 : leash, task: a.task)
   }
 
-  func run(
-    _ intents: [Intent], for a: Actor, wandering: Bool = false, then: (() -> Void)? = nil
-  ) {
+  func run(_ intents: [Intent], for a: Actor, wandering: Bool = false) {
+    cancelCleanup(a)  // nothing may end a cleanup without its bookkeeping
     a.puppet.removeAction(forKey: "brain")
     a.puppet.setWalking(false)
     a.wandering = wandering
@@ -393,7 +463,10 @@ final class World {
       }
     }
     steps.append(.run { [weak a] in a?.task = nil })
-    if let then { steps.append(.run(then)) }
+    steps.append(
+      .run { [weak self, weak a] in
+        DispatchQueue.main.async { if let self, let a { self.brainEnded(a) } }
+      })
     a.puppet.run(.sequence(steps), withKey: "brain")
     stage.noteActivity()
   }
@@ -433,11 +506,11 @@ final class World {
       scene.addChild(node)
       stage.draggables.append(node)
     }
-    let old = node.display
     let settled = settle(node, at: point)
-    if node.display != old {
+    let target = stage.overlay.overlays[node.display]?.scene
+    if node.parent !== target {
       node.removeFromParent()
-      stage.overlay.overlays[node.display]?.scene.addChild(node)
+      target?.addChild(node)
     }
     model.move(id, to: settled.center, display: node.display)
     let hop = SKAction.customAction(withDuration: 0.45) { n, t in

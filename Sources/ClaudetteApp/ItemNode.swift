@@ -8,7 +8,10 @@ final class ItemNode: SKNode, Draggable {
   let itemID: ItemID
   private(set) var display: CGDirectDisplayID
   private var prop: PropNode
-  private let privacy: Bool
+  private(set) var privacy: Bool
+  private var currentScene: ToolScene
+  private var currentCaption: String?
+  private var currentCommand: String?
   private let isTerminal: Bool
   /// Hover text: the full command, a path, and for a finished terminal its result.
   var tooltipLines: () -> [String] = { [] }
@@ -27,6 +30,7 @@ final class ItemNode: SKNode, Draggable {
     itemID = id
     self.display = display
     self.privacy = privacy
+    currentScene = scene
     if case .shell = scene { isTerminal = true } else { isTerminal = false }
     prop = PropNode(scene: scene, privacy: privacy)
     super.init()
@@ -50,6 +54,7 @@ final class ItemNode: SKNode, Draggable {
 
   /// Terminals get bigger and show the start of the command on their screen.
   func showCommand(_ command: String) {
+    currentCommand = command
     prop.body.childNode(withName: "command")?.removeFromParent()
     guard isTerminal, !command.isEmpty else { return }
     let size: CGFloat = 6.5
@@ -69,6 +74,9 @@ final class ItemNode: SKNode, Draggable {
 
   /// Rebuilds the prop (a terminal turning into "still running…", then "done" or "failed").
   func restyle(_ scene: ToolScene, caption: String? = nil, command: String? = nil) {
+    currentScene = scene
+    currentCaption = caption
+    if let command { currentCommand = command }
     prop.removeFromParent()
     prop = PropNode(scene: scene, privacy: privacy, caption: caption)
     prop.plug?.isHidden = true
@@ -81,6 +89,13 @@ final class ItemNode: SKNode, Draggable {
     let final = xScale
     setScale(0.01)
     run(.scale(to: final, duration: 0.25))
+  }
+
+  /// Redraws the names on this item (privacy mode was switched).
+  func setPrivacy(_ on: Bool) {
+    guard on != privacy else { return }
+    privacy = on
+    restyle(currentScene, caption: currentCaption, command: currentCommand)
   }
 
   func pop() {

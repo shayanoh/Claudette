@@ -25,6 +25,10 @@ final class Actor {
   var nextRoam = Date.distantPast
   /// Set while she is collecting items for the trash can.
   var cleaning: CleanupRun?
+  /// Her session ended and she is tidying up before she goes; a resume of the same session id keeps her.
+  var leaving = false
+  /// The project folder name without privacy applied (the displayed `projectName` may be dots).
+  var rawProjectName = ""
   /// What she carries to the can (up to three, stacked in front of her).
   var armful: [ItemNode] = []
   /// The project name under her feet while the pointer is over her. It lives in the scene, not in
@@ -183,8 +187,10 @@ final class Stage {
       actor.puppet.setContext(state.contextUsedPercentage, privacy: settings.settings.privacyMode)
       dress(actor.puppet, state: state)
       for sub in actor.subs.values { dress(sub.puppet, state: state) }
-      let name = state.cwd.map { ($0 as NSString).lastPathComponent } ?? ""
-      actor.projectName = settings.settings.privacyMode && !name.isEmpty ? "•••" : name
+      actor.rawProjectName = state.cwd.map { ($0 as NSString).lastPathComponent } ?? ""
+      actor.projectName =
+        settings.settings.privacyMode && !actor.rawProjectName.isEmpty
+        ? "•••" : actor.rawProjectName
     }
     updatePause()
   }
@@ -204,6 +210,17 @@ final class Stage {
   }
 
   private func addActor(_ id: String) {
+    if let leaving = actors[id], leaving.leaving {
+      // The session came back while she was still tidying up before leaving: keep her.
+      leaving.leaving = false
+      if ProcessInfo.processInfo.environment["CLAUDETTE_DEBUG_CLEANUP"] != nil {
+        fputs("cleanup: leaving: session \(id) came back, kept\n", stderr)
+      }
+      world.cancelCleanup(leaving)
+      for sub in leaving.subs.values { world.cancelCleanup(sub) }
+      leaving.puppet.idle()
+      return
+    }
     guard actors[id] == nil, let display = cursorDisplay() ?? overlay.mainDisplayID else { return }
     let a = Actor(sessionID: id, order: nextOrder, display: display)
     nextOrder += 1
@@ -219,7 +236,15 @@ final class Stage {
   /// She tidies up what only her session used, then leaves.
   private func endSession(_ id: String) {
     guard let a = actors[id] else { return }
-    world.collectForLeaving(session: id, actor: a) { [weak self] in self?.removeActor(id) }
+    a.leaving = true
+    world.collectForLeaving(session: id, actor: a) { [weak self, weak a] in
+      // Resumed in the meantime (same session id): she stays.
+      guard let a, a.leaving else { return }
+      if ProcessInfo.processInfo.environment["CLAUDETTE_DEBUG_CLEANUP"] != nil {
+        fputs("cleanup: leaving: removed \(id)\n", stderr)
+      }
+      self?.removeActor(id)
+    }
   }
 
   private func removeActor(_ id: String) {
@@ -405,6 +430,11 @@ final class Stage {
       a.puppet.reduceMotion = reduceMotion
     }
     world.applyScale()
+    world.applyPrivacy()
+    for a in actors.values {
+      a.projectName =
+        settings.settings.privacyMode && !a.rawProjectName.isEmpty ? "•••" : a.rawProjectName
+    }
     overlay.focusHidden = settings.settings.focusMode
     relayout()
   }
@@ -415,6 +445,7 @@ final class Stage {
   }
 
   private func screensChanged() {
+    defer { world.relocateItems() }
     for a in actors.values {
       if screen(a.display) == nil, let main = overlay.mainDisplayID { a.display = main }
       // The clamp may move her onto another screen: her display (and scene) must follow.
@@ -518,7 +549,8 @@ final class Stage {
       let r = rect(a)
       let inside = r.contains(p)
       var cornered = false
-      if s.dodgeEnabled && !reduceMotion && !modifiers.contains(.option) && !a.isDodging
+      if s.dodgeEnabled && a.cleaning == nil && !reduceMotion && !modifiers.contains(.option)
+        && !a.isDodging
         && Date().timeIntervalSince(a.lastDodge) > 0.35
       {
         let others = actors.values.filter { $0 !== a && $0.visible }.map(rect)
@@ -560,6 +592,7 @@ final class Stage {
   }
 
   private func dodge(_ a: Actor, to origin: CGPoint) {
+    world.interrupt(a)
     let now = Date()
     a.origin = origin
     a.userPlaced = true
@@ -576,7 +609,10 @@ final class Stage {
         move,
         .run { [weak self, weak a] in
           a?.isDodging = false
-          if let self, let a { self.world.putDownHeld(a) }
+          if let self, let a {
+            self.world.putDownHeld(a)
+            self.world.brainEnded(a)  // back to pacing if Claude is still thinking
+          }
         },
       ]), withKey: "move")
   }
@@ -611,6 +647,7 @@ final class Stage {
   private func tick() {
     updateFrameRate()
     world.tickSubs()
+    for a in actors.values { placeNameTag(a) }
     tickCount += 1
     if tickCount % 2 == 0 { world.tickPerch() }  // about 2 Hz
     let now = Date()
@@ -647,6 +684,7 @@ final class Stage {
       return
     }
     dragging = a
+    world.interrupt(a)  // the walk would otherwise keep overwriting her position
     bringToFront(a)
     dragOffset = CGPoint(x: p.x - a.origin.x, y: p.y - a.origin.y)
     physics = DragPhysics()
@@ -680,6 +718,7 @@ final class Stage {
       applyDisplayParent(a)
     }
     a.puppet.position = scenePosition(a)
+    placeNameTag(a)
   }
 
   func mouseUp(_ p: CGPoint) {
@@ -695,6 +734,9 @@ final class Stage {
     let v = physics.release()
     a.userPlaced = true
     a.dodgedAt = nil
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self, weak a] in
+      if let self, let a { self.world.brainEnded(a) }
+    }
     let frame = screen(a.display)?.frame ?? screenFrames.first ?? .zero
     if hypot(v.dx, v.dy) > 200 {
       let path = DragPhysics.glide(
