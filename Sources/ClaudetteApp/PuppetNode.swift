@@ -28,18 +28,25 @@ final class PuppetNode: SKNode {
   static let legLength: CGFloat = 23
   static let ink: CGFloat = 4.6
 
-  let shadow = SKShapeNode(ellipseOf: CGSize(width: 150, height: 16))
+  // Shapes in placeholder mode, sprites when built from the art export.
+  var shadow: SKNode = SKNode()
   let bodyPivot = SKNode()
   let face = SKNode()
-  let spark = SKShapeNode()
-  private(set) var legs: [SKShapeNode] = []
-  private(set) var arms: [SKShapeNode] = []
-  private(set) var eyes: [SKShapeNode] = []
+  var spark: SKNode = SKNode()
+  var legs: [SKNode] = []
+  var arms: [SKNode] = []
+  var eyes: [SKNode] = []
+  /// Art only: the smile sprite, hidden at rest.
+  var mouth: SKNode?
   private var asleep = false
 
   override init() {
     super.init()
-    build()
+    if let lib = ArtLibrary.shared {
+      buildFromArt(lib)
+    } else {
+      build()
+    }
   }
 
   required init?(coder: NSCoder) { fatalError("not supported") }
@@ -60,11 +67,13 @@ final class PuppetNode: SKNode {
   }
 
   private func build() {
-    shadow.fillColor = NSColor.black.withAlphaComponent(0.18)
-    shadow.strokeColor = .clear
-    shadow.position = CGPoint(x: 0, y: -2)
-    shadow.zPosition = -10
-    shadow.name = "shadow"
+    let shadowShape = SKShapeNode(ellipseOf: CGSize(width: 150, height: 16))
+    shadowShape.fillColor = NSColor.black.withAlphaComponent(0.18)
+    shadowShape.strokeColor = .clear
+    shadowShape.position = CGPoint(x: 0, y: -2)
+    shadowShape.zPosition = -10
+    shadowShape.name = "shadow"
+    shadow = shadowShape
     addChild(shadow)
 
     for (i, x) in [-51.0, -22.0, 22.0, 51.0].enumerated() {
@@ -162,11 +171,12 @@ final class PuppetNode: SKNode {
       face.addChild(blush)
     }
 
-    spark.path = Self.starPath(points: 8, outer: 14, inner: 6)
-    spark.fillColor = Palette.spark
-    spark.strokeColor = Palette.ink
-    spark.lineWidth = 3
-    spark.lineJoin = .round
+    let sparkShape = SKShapeNode(path: Self.starPath(points: 8, outer: 14, inner: 6))
+    sparkShape.fillColor = Palette.spark
+    sparkShape.strokeColor = Palette.ink
+    sparkShape.lineWidth = 3
+    sparkShape.lineJoin = .round
+    spark = sparkShape
     spark.position = CGPoint(x: 0, y: Self.legLength + b.height + 30)
     spark.zPosition = 5
     spark.name = "spark"
