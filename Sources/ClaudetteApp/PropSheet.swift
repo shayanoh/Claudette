@@ -49,3 +49,44 @@ enum PropSheet {
     }
   }
 }
+
+extension PropSheet {
+  /// Two overlapping Claudettes drawn like the overlay does (`ignoresSiblingOrder`): left with the
+  /// same z (parts interleave), right with a z band each (the one in front is whole).
+  static func renderOverlap(to url: URL) -> Bool {
+    let scene = SKScene(size: CGSize(width: 1040, height: 300))
+    scene.anchorPoint = .zero
+    scene.backgroundColor = NSColor(white: 0.9, alpha: 1)
+    for (half, zs) in [(0, (0.0, 0.0)), (1, (200.0, 400.0))] {
+      for (i, hue) in [0.08, 0.55].enumerated() {
+        let puppet = PuppetNode()
+        puppet.setScale(0.8)
+        puppet.setAccent(hue: hue)
+        puppet.position = CGPoint(x: 120 + CGFloat(half) * 380 + CGFloat(i) * 110, y: 30)
+        puppet.zPosition = CGFloat(i == 0 ? zs.0 : zs.1)
+        scene.addChild(puppet)
+      }
+    }
+    // Thinking bubble, project name tag and a small sub-agent.
+    let thinker = PuppetNode()
+    thinker.setScale(0.8)
+    thinker.position = CGPoint(x: 800, y: 50)
+    thinker.zPosition = 200
+    thinker.think(true)
+    thinker.setNameTag("Claudette")
+    scene.addChild(thinker)
+    let sub = PuppetNode()
+    sub.setScale(0.8 * 0.55)
+    sub.position = CGPoint(x: 940, y: 50)
+    sub.zPosition = 300
+    sub.setAccent(hue: 0.3)
+    scene.addChild(sub)
+    let view = SKView(frame: CGRect(origin: .zero, size: scene.size))
+    view.ignoresSiblingOrder = true
+    view.presentScene(scene)
+    guard let texture = view.texture(from: scene) else { return false }
+    let rep = NSBitmapImageRep(cgImage: texture.cgImage())
+    guard let png = rep.representation(using: .png, properties: [:]) else { return false }
+    return (try? png.write(to: url)) != nil
+  }
+}

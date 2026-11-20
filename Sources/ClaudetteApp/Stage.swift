@@ -13,7 +13,16 @@ final class Actor {
   var userPlaced = false
   var visible = true
   var placedOnce = false
-  var minis: [String: PuppetNode] = [:]
+  /// Sub-agents are little actors of their own (0.55x) that roam near this one.
+  var subs: [String: Actor] = [:]
+  /// Set on a sub-agent's actor.
+  weak var parent: Actor?
+  var sizeFactor: CGFloat = 1
+  var held: ItemNode?
+  var thinking = false
+  var wandering = false
+  var projectName = ""
+  var nextRoam = Date.distantPast
   /// What she is heading to or working on (lets a dragged item re-target her).
   var task: (item: ItemID, move: Move)?
   var lastPhase: SessionPhase = .idle
@@ -70,12 +79,19 @@ final class Stage {
 
   // Dragging
   private var dragging: Actor?
+  func isBeingDragged(_ a: Actor) -> Bool { dragging === a }
   private var dragOffset = CGPoint.zero
   private var physics = DragPhysics()
   private var lastDragTime = Date()
   private var lastDragPoint = CGPoint.zero
 
   private var timer: Timer?
+  /// With `ignoresSiblingOrder` SpriteKit sorts every part by its global z, so two Claudettes would
+  /// interleave their parts. Each gets a band of its own, wider than a puppet's internal z range
+  /// (about -50...30); sub-agents sit 100 above their parent.
+  private var topZ: CGFloat = 200
+  /// Overlay things that must always be above every Claudette (a dragged item, tooltips, confetti).
+  static let overlayZ: CGFloat = 100_000
   private(set) lazy var world = World(stage: self)
 
   init(overlay: OverlayController, settings: SettingsStore) {
@@ -121,9 +137,10 @@ final class Stage {
   /// Puppet position (feet centre) in its display's scene coordinates.
   func scenePosition(_ a: Actor) -> CGPoint {
     let f = screen(a.display)?.frame ?? .zero
+    let k = scale * a.sizeFactor
     return CGPoint(
-      x: a.origin.x - f.minX - PuppetNode.hitBounds.minX * scale,
-      y: a.origin.y - f.minY - PuppetNode.hitBounds.minY * scale)
+      x: a.origin.x - f.minX - PuppetNode.hitBounds.minX * k,
+      y: a.origin.y - f.minY - PuppetNode.hitBounds.minY * k)
   }
 
   // MARK: - Sessions
@@ -137,8 +154,9 @@ final class Stage {
         removeActor(id)
         world.sessionEnded(id)
       case .phaseChanged(let id, let phase): phaseChanged(id, phase)
-      case .subagentStarted(let id, let agent): addMini(id, agent)
-      case .subagentStopped(let id, let agent): removeMini(id, agent)
+      case .subagentStarted(let id, let agent): addSub(id, agent)
+      case .subagentStopped(let id, let agent): removeSub(id, agent)
+      case .thinkingChanged(let id, let on): world.thinkingChanged(session: id, on: on)
       case .toolStarted(let id, let tool):
         world.toolStarted(session: id, tool: tool, cwd: sessions[id]?.cwd)
       case .toolFinished(let id, _, let ok): if !ok { shake(id) }
@@ -155,12 +173,14 @@ final class Stage {
       guard let actor = actors[id] else { continue }
       actor.puppet.setContext(state.contextUsedPercentage, privacy: settings.settings.privacyMode)
       dress(actor.puppet, state: state)
-      for mini in actor.minis.values { dress(mini, state: state) }
+      for sub in actor.subs.values { dress(sub.puppet, state: state) }
+      let name = state.cwd.map { ($0 as NSString).lastPathComponent } ?? ""
+      actor.projectName = settings.settings.privacyMode && !name.isEmpty ? "•••" : name
     }
     updatePause()
   }
 
-  /// Model outfit and project scarf colour, the same for a session's puppet and its minis.
+  /// Model outfit and project scarf colour, the same for a session's puppet and its sub-agents.
   private func dress(_ puppet: PuppetNode, state: SessionState) {
     puppet.setOutfit(ModelFamily.from(displayName: state.model))
     puppet.setAccent(hue: Accent.hue(forProject: state.cwd ?? ""))
@@ -181,6 +201,7 @@ final class Stage {
     actors[id] = a
     a.puppet.setScale(scale)
     a.puppet.name = "puppet-\(id)"
+    bringToFront(a)
     relayout()
     a.puppet.wake()
   }
@@ -188,6 +209,7 @@ final class Stage {
   private func removeActor(_ id: String) {
     guard let a = actors.removeValue(forKey: id) else { return }
     if dragging === a { dragging = nil }
+    world.release(a)
     a.puppet.sleep()
     a.puppet.run(
       .sequence([.wait(forDuration: 1.4), .fadeOut(withDuration: 0.5), .removeFromParent()]))
@@ -225,16 +247,17 @@ final class Stage {
 
   /// Where her feet are, in global screen coordinates (what the brain plans in).
   func feet(of a: Actor) -> CGPoint {
-    CGPoint(
-      x: a.origin.x - PuppetNode.hitBounds.minX * scale,
-      y: a.origin.y - PuppetNode.hitBounds.minY * scale)
+    let k = scale * a.sizeFactor
+    return CGPoint(
+      x: a.origin.x - PuppetNode.hitBounds.minX * k, y: a.origin.y - PuppetNode.hitBounds.minY * k)
   }
 
   /// Puts her feet at `p` right now (the walk calls this every frame).
   func setFeet(_ a: Actor, _ p: CGPoint) {
     guard p.x.isFinite, p.y.isFinite else { return }
+    let k = scale * a.sizeFactor
     a.origin = CGPoint(
-      x: p.x + PuppetNode.hitBounds.minX * scale, y: p.y + PuppetNode.hitBounds.minY * scale)
+      x: p.x + PuppetNode.hitBounds.minX * k, y: p.y + PuppetNode.hitBounds.minY * k)
     if let d = display(at: p), d != a.display {
       a.display = d
       applyDisplayParent(a)
@@ -242,28 +265,61 @@ final class Stage {
     a.puppet.position = scenePosition(a)
   }
 
-  private func addMini(_ id: String, _ agent: String) {
-    guard let a = actors[id], a.minis[agent] == nil else { return }
-    let mini = PuppetNode()
-    mini.setScale(0.55)
-    mini.position = CGPoint(x: 70 + CGFloat(a.minis.count) * 85, y: -12)
-    mini.zPosition = 5
-    a.puppet.addChild(mini)
-    a.minis[agent] = mini
-    mini.wake()
+  /// A sub-agent is a small actor in the same scene, free to roam near its parent.
+  private func addSub(_ id: String, _ agent: String) {
+    guard let parent = actors[id], parent.subs[agent] == nil,
+      let scene = overlay.overlays[parent.display]?.scene
+    else { return }
+    let sub = Actor(sessionID: id, order: parent.order, display: parent.display)
+    sub.sizeFactor = 0.55
+    sub.parent = parent
+    sub.puppet.setScale(scale * sub.sizeFactor)
+    sub.puppet.name = "puppet-\(id)/\(agent)"
+    // Beside her, on the roomier side of the screen, and always fully on screen.
+    let feet = feet(of: parent)
+    let frame = screen(parent.display)?.frame ?? .zero
+    let side: CGFloat = feet.x > frame.midX ? -1 : 1
+    let gap = (170 + 70 * CGFloat(parent.subs.count)) * scale
+    scene.addChild(sub.puppet)
+    parent.subs[agent] = sub
+    let k = scale * sub.sizeFactor
+    let size = CGSize(
+      width: PuppetNode.hitBounds.width * k, height: PuppetNode.hitBounds.height * k)
+    let wanted = CGPoint(
+      x: feet.x + side * gap + PuppetNode.hitBounds.minX * k,
+      y: feet.y + PuppetNode.hitBounds.minY * k)
+    let fitted = ScreenFit.clamp(wanted, size: size, to: screenFrames)
+    setFeet(
+      sub,
+      CGPoint(
+        x: fitted.x - PuppetNode.hitBounds.minX * k, y: fitted.y - PuppetNode.hitBounds.minY * k))
+    sub.puppet.zPosition = parent.puppet.zPosition + 100
+    sub.puppet.wake()
+    noteActivity()
   }
 
-  private func removeMini(_ id: String, _ agent: String) {
-    guard let mini = actors[id]?.minis.removeValue(forKey: agent) else { return }
-    mini.run(.sequence([.fadeOut(withDuration: 0.3), .removeFromParent()]))
+  private func removeSub(_ id: String, _ agent: String) {
+    guard let sub = actors[id]?.subs.removeValue(forKey: agent) else { return }
+    world.release(sub)
+    sub.puppet.run(.sequence([.fadeOut(withDuration: 0.3), .removeFromParent()]))
   }
+
+  /// Puts her (and her sub-agents) in front of everyone else.
+  func bringToFront(_ a: Actor) {
+    topZ += 200
+    a.puppet.zPosition = topZ
+    for sub in a.subs.values { sub.puppet.zPosition = topZ + 100 }
+  }
+
+  /// Every on-screen actor, sub-agents included.
+  var allActors: [Actor] { actors.values.flatMap { [$0] + Array($0.subs.values) } }
 
   private func cursorDisplay() -> CGDirectDisplayID? { display(at: NSEvent.mouseLocation) }
 
   // MARK: - Layout
 
   func settingsChanged() {
-    actors.values.forEach { $0.puppet.setScale(scale) }
+    for a in allActors { a.puppet.setScale(scale * a.sizeFactor) }
     world.applyScale()
     overlay.focusHidden = settings.settings.focusMode
     relayout()
@@ -324,7 +380,7 @@ final class Stage {
         p.fillColor = Palette.ink.withAlphaComponent(0.9)
         p.strokeColor = Palette.highlight
         p.lineWidth = 2
-        p.zPosition = 50
+        p.zPosition = Stage.overlayZ - 1
         let l = SKLabelNode()
         l.name = "text"
         l.fontName = "AvenirNext-Bold"
@@ -395,6 +451,7 @@ final class Stage {
         a,
         on: inside && s.hoverFadeEnabled
           && (!s.dodgeEnabled || reduceMotion || cornered || modifiers.contains(.option)))
+      a.puppet.setNameTag(inside && !a.projectName.isEmpty ? a.projectName : nil)
       trackPetting(a, inside: inside, at: p)
     }
   }
@@ -431,7 +488,13 @@ final class Stage {
     let move = SKAction.move(to: scenePosition(a), duration: 0.3)
     move.timingMode = .easeOut
     a.puppet.run(
-      .sequence([move, .run { [weak a] in a?.isDodging = false }]), withKey: "move")
+      .sequence([
+        move,
+        .run { [weak self, weak a] in
+          a?.isDodging = false
+          if let self, let a { self.world.putDownHeld(a) }
+        },
+      ]), withKey: "move")
   }
 
   func applyDisplayParent(_ a: Actor) {
@@ -463,6 +526,7 @@ final class Stage {
   /// 4 Hz: petting after a still hover, and dodged Claudettes wandering back home.
   private func tick() {
     updateFrameRate()
+    world.tickSubs()
     let now = Date()
     var needsLayout = false
     for a in actors.values {
@@ -497,6 +561,7 @@ final class Stage {
       return
     }
     dragging = a
+    bringToFront(a)
     dragOffset = CGPoint(x: p.x - a.origin.x, y: p.y - a.origin.y)
     physics = DragPhysics()
     physics.begin(at: p)

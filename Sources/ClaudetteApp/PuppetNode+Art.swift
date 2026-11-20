@@ -286,3 +286,90 @@ extension PuppetNode {
     }
   }
 }
+
+// MARK: - Thinking bubble and the project name tag
+
+extension PuppetNode {
+  /// A thought cloud with pulsing dots and a few slow sparkles while Claude is thinking.
+  func think(_ on: Bool) {
+    childNode(withName: "thought")?.removeFromParent()
+    guard on else { return }
+    let bubble = SKNode()
+    bubble.name = "thought"
+    bubble.position = CGPoint(x: 96, y: PuppetNode.hitBounds.maxY + 10)
+    bubble.zPosition = 20
+    for (i, r) in [4.0, 6.0].enumerated() {
+      let dot = SKShapeNode(circleOfRadius: CGFloat(r))
+      dot.fillColor = Palette.hex(0xFFF8F0)
+      dot.strokeColor = Palette.ink
+      dot.lineWidth = 2
+      dot.position = CGPoint(x: -20 + CGFloat(i) * 9, y: -22 + CGFloat(i) * 9)
+      bubble.addChild(dot)
+    }
+    let cloud = SKShapeNode(ellipseOf: CGSize(width: 54, height: 34))
+    cloud.fillColor = Palette.hex(0xFFF8F0)
+    cloud.strokeColor = Palette.ink
+    cloud.lineWidth = 2.5
+    bubble.addChild(cloud)
+    for i in 0..<3 {
+      let d = SKShapeNode(circleOfRadius: 3)
+      d.fillColor = Palette.ink
+      d.strokeColor = .clear
+      d.position = CGPoint(x: CGFloat(i - 1) * 12, y: 0)
+      d.run(
+        .repeatForever(
+          .sequence([
+            .wait(forDuration: Double(i) * 0.25), .scale(to: 1.5, duration: 0.25),
+            .scale(to: 1, duration: 0.25), .wait(forDuration: 0.5 - Double(i) * 0.25),
+          ])))
+      bubble.addChild(d)
+    }
+    for i in 0..<3 {
+      let sparkle = SKShapeNode(path: PuppetNode.starPath(points: 4, outer: 5, inner: 1.6))
+      sparkle.fillColor = Palette.hex(0xFFC94D)
+      sparkle.strokeColor = .clear
+      sparkle.alpha = 0
+      sparkle.position = CGPoint(x: CGFloat(i - 1) * 22, y: 16)
+      sparkle.run(
+        .repeatForever(
+          .sequence([
+            .wait(forDuration: Double(i) * 0.9),
+            .group([
+              .sequence([.fadeIn(withDuration: 0.4), .fadeOut(withDuration: 1.4)]),
+              .moveBy(x: 0, y: 22, duration: 1.8),
+            ]),
+            .move(to: CGPoint(x: CGFloat(i - 1) * 22, y: 16), duration: 0),
+            .wait(forDuration: 1.0),
+          ])))
+      bubble.addChild(sparkle)
+    }
+    addChild(bubble)
+  }
+
+  /// The project (folder or worktree) name under her feet; nil hides it.
+  func setNameTag(_ text: String?) {
+    let name = "nametag"
+    guard let text, let entry = LabelTexture.entry(text, size: 12) else {
+      childNode(withName: name)?.run(
+        .sequence([.fadeOut(withDuration: 0.12), .removeFromParent()]), withKey: "fade")
+      return
+    }
+    if let existing = childNode(withName: name) as? SKSpriteNode,
+      existing.userData?["text"] as? String == text
+    {
+      existing.removeAction(forKey: "fade")
+      existing.alpha = 1
+      return
+    }
+    childNode(withName: name)?.removeFromParent()
+    let tag = SKSpriteNode(texture: entry.texture, size: entry.size)
+    tag.name = name
+    tag.userData = ["text": text]
+    tag.anchorPoint = CGPoint(x: 0.5, y: 1)
+    tag.position = CGPoint(x: 0, y: LabelTexture.padding - 4)
+    tag.zPosition = 30
+    tag.alpha = 0
+    addChild(tag)
+    tag.run(.fadeIn(withDuration: 0.12), withKey: "fade")
+  }
+}

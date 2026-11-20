@@ -35,7 +35,16 @@ final class ItemNode: SKNode, Draggable {
 
   required init?(coder: NSCoder) { fatalError("not supported") }
 
-  func setUIScale(_ s: CGFloat) { setScale(s * (isTerminal ? 1.3 : 1)) }
+  private var typeFactor: CGFloat { isTerminal ? 1.3 : 1 }
+  private var uiScale: CGFloat = 1
+
+  func setUIScale(_ s: CGFloat) {
+    uiScale = s
+    setScale(s * typeFactor)
+  }
+
+  /// In her hands the item is a child of her puppet (which already carries the size setting).
+  func setHeld(_ held: Bool) { setScale(held ? 0.8 * typeFactor : uiScale * typeFactor) }
 
   /// Terminals get bigger and show the start of the command on their screen.
   func showCommand(_ command: String) {
@@ -121,6 +130,7 @@ final class ItemNode: SKNode, Draggable {
     }
     node.position = CGPoint(x: 0, y: 48)
     node.zPosition = 100
+    zPosition = Stage.overlayZ - 10  // its tooltip must not hide behind a Claudette
     node.setScale(1 / max(xScale, 0.01))  // readable at any size setting
     node.alpha = 0
     addChild(node)
@@ -129,6 +139,7 @@ final class ItemNode: SKNode, Draggable {
   }
 
   func pointerExited() {
+    if tip != nil, !isDragging { zPosition = 0 }
     tip?.removeFromParent()
     tip = nil
   }
@@ -137,7 +148,7 @@ final class ItemNode: SKNode, Draggable {
     pointerExited()
     isDragging = true
     removeAllActions()
-    zPosition = 40
+    zPosition = Stage.overlayZ - 5
     let c = globalCenter
     grab = CGPoint(x: c.x - point.x, y: c.y - point.y)
     run(.scale(by: 1.12, duration: 0.08))

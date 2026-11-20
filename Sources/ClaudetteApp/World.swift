@@ -19,7 +19,9 @@ final class World {
   // MARK: Tool events
 
   func toolStarted(session: String, tool: ToolActivity, cwd: String?) {
-    guard let actor = stage.actors[session] else { return }
+    guard let parent = stage.actors[session] else { return }
+    // A tool call inside a sub-agent is that little actor's work, not the parent's.
+    let actor = tool.agentID.flatMap { parent.subs[$0] } ?? parent
     let scene = SceneMapper.scene(for: tool, now: Date())
     guard
       let touched = model.touch(for: session, tool: tool, scene: scene, cwd: cwd, now: Date())
@@ -46,6 +48,113 @@ final class World {
       world: model.all, screens: stage.screenFrames, rng: &rng)
     actor.task = (item.id, move)
     run(intents, for: actor)
+  }
+
+  // MARK: Thinking, sub-agents
+
+  func thinkingChanged(session: String, on: Bool) {
+    guard let a = stage.actors[session] else { return }
+    a.thinking = on
+    a.puppet.think(on)
+    if on {
+      startWander(a)
+    } else if a.wandering {
+      a.wandering = false
+      a.puppet.removeAction(forKey: "brain")
+      a.puppet.setWalking(false)
+    }
+  }
+
+  /// She paces about while Claude thinks: one batch of legs, then another while it lasts.
+  private func startWander(_ a: Actor) {
+    guard a.thinking, !stage.reduceMotion, !stage.isBeingDragged(a), !a.isDodging,
+      a.puppet.action(forKey: "brain") == nil
+    else { return }
+    let intents = brain.plan(
+      event: .thinkingChanged(true), actor: brainActor(a), world: model.all,
+      screens: stage.screenFrames, rng: &rng)
+    run(intents, for: a, wandering: true) { [weak self, weak a] in
+      guard let self, let a else { return }
+      a.wandering = false
+      self.startWander(a)
+    }
+  }
+
+  /// About 4 Hz: sub-agents without a job drift around their parent, or come back inside the leash.
+  func tickSubs() {
+    let now = Date()
+    for parent in stage.actors.values {
+      for sub in parent.subs.values where sub.puppet.action(forKey: "brain") == nil {
+        guard now >= sub.nextRoam else { continue }
+        sub.nextRoam = now.addingTimeInterval(.random(in: 2.5...6, using: &rng))
+        let outside =
+          hypot(
+            stage.feet(of: sub).x - stage.feet(of: parent).x,
+            stage.feet(of: sub).y - stage.feet(of: parent).y) > leash
+        let event: BrainEvent = outside || Bool.random(using: &rng) ? .idle : .thinkingChanged(true)
+        var intents = brain.plan(
+          event: event, actor: brainActor(sub), world: model.all, screens: stage.screenFrames,
+          rng: &rng)
+        intents.removeAll { if case .play(.think) = $0 { return true } else { return false } }
+        run(intents, for: sub)
+      }
+    }
+  }
+
+  /// How far a sub-agent strays from its parent.
+  private var leash: CGFloat { 260 * stage.scale }
+
+  // MARK: Carrying
+
+  /// She takes the item into her hands (it rides along if she dodges) until she tosses or sets it down.
+  private func pickUp(_ a: Actor, _ id: ItemID) {
+    guard a.held == nil, let node = nodes[id] else { return }
+    node.removeAllActions()
+    node.pointerExited()
+    stage.draggables.removeAll { $0 === node }
+    node.removeFromParent()
+    node.setHeld(true)
+    node.position = CGPoint(x: -88, y: 112)
+    node.zPosition = 6
+    a.puppet.addChild(node)
+    a.held = node
+  }
+
+  /// Puts what she holds on the screen at `point` (global), or beside her feet.
+  func putDownHeld(_ a: Actor, at point: CGPoint? = nil) {
+    guard let node = a.held else { return }
+    a.held = nil
+    let feet = stage.feet(of: a)
+    let spot = point ?? CGPoint(x: feet.x - 130 * stage.scale, y: feet.y + 20)
+    node.removeFromParent()
+    node.setHeld(false)
+    node.zPosition = 0
+    let settled = settle(node, at: spot)
+    node.position = settled.scenePosition
+    stage.overlay.overlays[node.display]?.scene.addChild(node)
+    stage.draggables.append(node)
+    model.move(node.itemID, to: settled.center, display: node.display)
+    node.pop()
+  }
+
+  /// A leaving actor sets down what she holds (nothing may be orphaned inside a removed puppet).
+  func release(_ a: Actor) {
+    putDownHeld(a)
+    a.puppet.removeAction(forKey: "brain")
+  }
+
+  /// Keeps `center` fully on a screen and works out the display and scene position.
+  private func settle(_ node: ItemNode, at center: CGPoint) -> (
+    center: CGPoint, scenePosition: CGPoint
+  ) {
+    let size = ItemNode.footprint
+    let fitted = ScreenFit.clamp(
+      CGPoint(x: center.x - size.width / 2, y: center.y - size.height / 2), size: size,
+      to: stage.screenFrames)
+    let c = CGPoint(x: fitted.x + size.width / 2, y: fitted.y + size.height / 2)
+    node.moveToDisplay(stage.display(at: c) ?? node.display)
+    let o = node.originOfDisplay(node.display)
+    return (c, CGPoint(x: c.x - o.x, y: c.y - o.y))
   }
 
   func toolResult(toolUseID: String, result: ToolResult) {
@@ -123,20 +232,15 @@ final class World {
   /// The mouse dropped an item: keep it fully on a screen, on whichever display it landed, and send
   /// anyone heading for it to the new spot.
   private func dropped(_ node: ItemNode, at point: CGPoint) {
-    let size = ItemNode.footprint
-    let origin = CGPoint(x: point.x - size.width / 2, y: point.y - size.height / 2)
-    let fitted = ScreenFit.clamp(origin, size: size, to: stage.screenFrames)
-    let center = CGPoint(x: fitted.x + size.width / 2, y: fitted.y + size.height / 2)
-    let display = stage.display(at: center) ?? node.display
-    if display != node.display {
+    let old = node.display
+    let settled = settle(node, at: point)
+    if node.display != old {
       node.removeFromParent()
-      node.moveToDisplay(display)
-      stage.overlay.overlays[display]?.scene.addChild(node)
+      stage.overlay.overlays[node.display]?.scene.addChild(node)
     }
-    let o = node.originOfDisplay(display)
-    node.position = CGPoint(x: center.x - o.x, y: center.y - o.y)
-    model.move(node.itemID, to: center, display: display)
-    for actor in stage.actors.values where actor.task?.item == node.itemID {
+    node.position = settled.scenePosition
+    model.move(node.itemID, to: settled.center, display: node.display)
+    for actor in stage.allActors where actor.task?.item == node.itemID {
       let intents = brain.plan(
         event: .itemMoved(node.itemID), actor: brainActor(actor), world: model.all,
         screens: stage.screenFrames, rng: &rng)
@@ -147,12 +251,18 @@ final class World {
   // MARK: Executing intents
 
   private func brainActor(_ a: Actor) -> BrainActor {
-    BrainActor(position: stage.feet(of: a), task: a.task)
+    let sub = a.parent
+    return BrainActor(
+      position: stage.feet(of: a), holding: a.held?.itemID, isSubagent: sub != nil,
+      anchor: sub.map { stage.feet(of: $0) }, leash: sub == nil ? 0 : leash, task: a.task)
   }
 
-  func run(_ intents: [Intent], for a: Actor) {
+  func run(
+    _ intents: [Intent], for a: Actor, wandering: Bool = false, then: (() -> Void)? = nil
+  ) {
     a.puppet.removeAction(forKey: "brain")
     a.puppet.setWalking(false)
+    a.wandering = wandering
     guard !intents.isEmpty else {
       a.task = nil
       return
@@ -170,10 +280,15 @@ final class World {
         steps.append(.run { [weak self] in self?.toss(id, to: to) })
         steps.append(.wait(forDuration: 0.5))
       case .wait(let t): steps.append(.wait(forDuration: t))
-      case .face, .pickUp, .putDown, .sit, .fall: break  // later tasks
+      case .pickUp(let id):
+        steps.append(.run { [weak self, weak a] in if let a { self?.pickUp(a, id) } })
+      case .putDown(let p):
+        steps.append(.run { [weak self, weak a] in if let a { self?.putDownHeld(a, at: p) } })
+      case .face, .sit, .fall: break  // later tasks
       }
     }
     steps.append(.run { [weak a] in a?.task = nil })
+    if let then { steps.append(.run(then)) }
     a.puppet.run(.sequence(steps), withKey: "brain")
     stage.noteActivity()
   }
@@ -198,24 +313,30 @@ final class World {
 
   private func toss(_ id: ItemID, to point: CGPoint) {
     guard let node = nodes[id] else { return }
-    let size = ItemNode.footprint
-    let fitted = ScreenFit.clamp(
-      CGPoint(x: point.x - size.width / 2, y: point.y - size.height / 2), size: size,
-      to: stage.screenFrames)
-    let center = CGPoint(x: fitted.x + size.width / 2, y: fitted.y + size.height / 2)
-    let display = stage.display(at: center) ?? node.display
-    if display != node.display {
+    // Thrown from her hands: it leaves from where she holds it.
+    if let holder = stage.allActors.first(where: { $0.held === node }),
+      let scene = stage.overlay.overlays[holder.display]?.scene, let parent = node.parent
+    {
+      let from = parent.convert(node.position, to: scene)
+      holder.held = nil
       node.removeFromParent()
-      node.moveToDisplay(display)
-      stage.overlay.overlays[display]?.scene.addChild(node)
+      node.setHeld(false)
+      node.zPosition = 0
+      node.position = from
+      scene.addChild(node)
+      stage.draggables.append(node)
     }
-    let o = node.originOfDisplay(display)
-    let dest = CGPoint(x: center.x - o.x, y: center.y - o.y)
-    model.move(id, to: center, display: display)
+    let old = node.display
+    let settled = settle(node, at: point)
+    if node.display != old {
+      node.removeFromParent()
+      stage.overlay.overlays[node.display]?.scene.addChild(node)
+    }
+    model.move(id, to: settled.center, display: node.display)
     let hop = SKAction.customAction(withDuration: 0.45) { n, t in
       n.zRotation = sin(t / 0.45 * .pi * 2) * 0.35
     }
-    let fly = SKAction.move(to: dest, duration: 0.45)
+    let fly = SKAction.move(to: settled.scenePosition, duration: 0.45)
     fly.timingMode = .easeOut
     node.run(.group([fly, hop]), withKey: "toss")
     node.run(.sequence([.wait(forDuration: 0.5), .rotate(toAngle: 0, duration: 0.1)]))

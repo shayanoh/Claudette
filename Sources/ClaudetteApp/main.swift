@@ -46,6 +46,12 @@ if let i = args.firstIndex(of: "--render-props") {
   exit(PropSheet.render(to: URL(fileURLWithPath: args[i + 1])) ? 0 : 1)
 }
 
+// Developer helper: `Claudette --render-overlap <png>` draws two overlapping Claudettes and exits.
+if let i = args.firstIndex(of: "--render-overlap"), i + 1 < args.count {
+  _ = NSApplication.shared
+  exit(PropSheet.renderOverlap(to: URL(fileURLWithPath: args[i + 1])) ? 0 : 1)
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

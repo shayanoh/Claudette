@@ -449,7 +449,7 @@ final class LimitsHUD {
       let piece = SKSpriteNode(color: colors.randomElement()!, size: CGSize(width: 8, height: 4))
       piece.position = CGPoint(x: .random(in: 0...scene.size.width), y: scene.size.height + 10)
       piece.zRotation = .random(in: 0...(.pi))
-      piece.zPosition = 80
+      piece.zPosition = Stage.overlayZ
       scene.addChild(piece)
       let fall = Double.random(in: 1.6...3.2)
       piece.run(
