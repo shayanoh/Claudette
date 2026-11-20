@@ -56,6 +56,12 @@ glances at it to learn "needs me", "long shell running", or "limit hit" without 
     hover; hovering still for a couple of seconds gets petted-happy reactions. Dodge and hover
     fade are independent settings; when both are on, dodging is tried first and fade covers
     the cases where she cannot move away.
+17. **Skill loading** (user request): when Claude loads a skill she opens a glowing spellbook,
+    the skill's name floats up as a rune, and a swirl of sparkles flows into her head (she
+    does a little "learned it!" beat). Detected from a `Skill` tool call (PreToolUse
+    `tool_input`, field name to confirm in the spike) and from `UserPromptExpansion` for slash
+    commands. Loading `CLAUDE.md`/rules (`InstructionsLoaded`) is a smaller "reads the rule
+    book" beat.
 16. **All desktops (Spaces):** Claudette is present on every macOS desktop and over full-screen
     apps. Switching Spaces keeps her at the same screen position with no flicker (overlay
     panel uses `canJoinAllSpaces` + `fullScreenAuxiliary` + `stationary` collection
@@ -159,11 +165,16 @@ Docs say it may lag the current turn.
 
 ### Installing the feed
 
-Preferred: ship a Claude Code **plugin** (hooks.json using `http` handlers to the app's
-127.0.0.1 server, all `async` so Claude is never slowed) so install/uninstall is clean and
-reversible; the status line wrapper is the one piece that needs a user-approved edit to
-`settings.json` (never edited silently). If the app is not running, hook delivery fails
-non-blocking. These install details are my call and need a quick verification spike.
+Preferred: ship a Claude Code **plugin** (`hooks/hooks.json` using `http` handlers to the app's
+127.0.0.1 server, short `timeout`, server replies instantly with an empty 2xx) so
+install/uninstall is clean and reversible. The docs list no `async` option for `http` handlers
+(only for `command`), so none is used; a refused connection is a non-blocking error, so a
+closed app never blocks Claude. Plugin install route to try first: a skills-dir plugin at
+`~/.claude/skills/claudette/` (docs: loads in the next session, no install step); fallbacks:
+`--plugin-dir` or a local marketplace. The docs do not say plugins can set `statusLine`, so the
+status line wrapper is the one piece that needs a user-approved edit to `settings.json`
+(never edited silently). `allowedHttpHookUrls` only matters if the user defined it. These
+install details need the verification spike.
 
 ## Architecture
 
