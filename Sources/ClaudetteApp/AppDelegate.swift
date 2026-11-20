@@ -150,6 +150,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         model.stage.debugDragFirst(to: CGPoint(x: f.midX - 200, y: f.midY))
       }
     }
+    if env["CLAUDETTE_DEBUG_MOONDRAG"] != nil {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [model] in
+        let f = NSScreen.main?.frame ?? .zero
+        model.stage.debugDragFirstDraggable(to: CGPoint(x: f.midX, y: f.midY + 150))
+      }
+    }
     if let steps = env["CLAUDETTE_DEBUG_INSTALL"] {
       // e.g. "plugin,statusline" or "unplugin,unstatusline" (needs CLAUDETTE_HOME + AUTOCONFIRM)
       DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in

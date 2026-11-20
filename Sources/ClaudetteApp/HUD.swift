@@ -178,6 +178,89 @@ final class MoonNode: SKNode {
   }
 }
 
+/// Lets the pointer fade the moon and carry it around. It stays grabbable while faded (a faded
+/// moon that let clicks through could not be picked up), and its position is stored as a fraction
+/// of the main display's visible frame so it survives resolution changes.
+final class MoonHandle: Draggable {
+  private let moon: MoonNode
+  private let overlay: OverlayController
+  private let settings: SettingsStore
+  private var grabOffset = CGPoint.zero
+  private(set) var isDragging = false
+  /// Half the moon's footprint (disc and caption), used for the hit rectangle and the clamp.
+  private static let half = CGSize(width: 44, height: 36)
+
+  init(moon: MoonNode, overlay: OverlayController, settings: SettingsStore) {
+    self.moon = moon
+    self.overlay = overlay
+    self.settings = settings
+  }
+
+  private var screen: NSScreen? {
+    guard let id = overlay.mainDisplayID else { return nil }
+    return NSScreen.screens.first { OverlayController.displayID(of: $0) == id }
+  }
+
+  /// Moon centre in global coordinates.
+  private var center: CGPoint? {
+    guard let s = screen, moon.parent != nil, !moon.isHidden else { return nil }
+    return CGPoint(x: moon.position.x + s.frame.minX, y: moon.position.y + s.frame.minY)
+  }
+
+  var hitRect: CGRect {
+    guard let c = center else { return .null }
+    return CGRect(
+      x: c.x - Self.half.width, y: c.y - Self.half.height - 8, width: Self.half.width * 2,
+      height: Self.half.height * 2)
+  }
+
+  /// Scene position for the stored fractions, or nil for the default corner.
+  func storedPosition(in scene: SKScene) -> CGPoint? {
+    guard let s = screen, let fx = settings.settings.moonX, let fy = settings.settings.moonY
+    else { return nil }
+    let v = s.visibleFrame
+    return clamp(
+      CGPoint(x: v.minX + fx * v.width - s.frame.minX, y: v.minY + fy * v.height - s.frame.minY),
+      in: s)
+  }
+
+  private func clamp(_ scenePoint: CGPoint, in s: NSScreen) -> CGPoint {
+    let v = s.visibleFrame.offsetBy(dx: -s.frame.minX, dy: -s.frame.minY)
+    let r = v.insetBy(dx: Self.half.width, dy: Self.half.height)
+    guard r.width > 0, r.height > 0 else { return CGPoint(x: v.midX, y: v.midY) }
+    return CGPoint(
+      x: min(r.maxX, max(r.minX, scenePoint.x)), y: min(r.maxY, max(r.minY, scenePoint.y)))
+  }
+
+  func pointerEntered() { moon.run(.fadeAlpha(to: 0.25, duration: 0.15), withKey: "fade") }
+  func pointerExited() { moon.run(.fadeAlpha(to: 1, duration: 0.15), withKey: "fade") }
+
+  func dragBegan(at point: CGPoint) {
+    guard let c = center else { return }
+    isDragging = true
+    grabOffset = CGPoint(x: c.x - point.x, y: c.y - point.y)
+  }
+
+  func dragMoved(to point: CGPoint) {
+    guard isDragging, let s = screen else { return }
+    let global = CGPoint(x: point.x + grabOffset.x, y: point.y + grabOffset.y)
+    moon.position = clamp(
+      CGPoint(x: global.x - s.frame.minX, y: global.y - s.frame.minY), in: s)
+  }
+
+  func dragEnded(at point: CGPoint) {
+    guard isDragging, let s = screen else { return }
+    isDragging = false
+    let v = s.visibleFrame
+    let fx = (moon.position.x + s.frame.minX - v.minX) / v.width
+    let fy = (moon.position.y + s.frame.minY - v.minY) / v.height
+    settings.update {
+      $0.moonX = Double(fx)
+      $0.moonY = Double(fy)
+    }
+  }
+}
+
 /// Draws the 22x16 menubar glyph: a small jar plus a moon, mirroring the limit state.
 enum MenuBarGlyph {
   static func image(five: WindowState, seven: WindowState, dot: NSColor?) -> NSImage {
@@ -220,6 +303,7 @@ final class LimitsHUD {
   private let overlay: OverlayController
   private let settings: SettingsStore
   private let moon = MoonNode()
+  private let moonHandle: MoonHandle
 
   /// Called with the new menubar image whenever the limit state may have changed.
   var onGlyph: ((NSImage) -> Void)?
@@ -229,6 +313,8 @@ final class LimitsHUD {
     self.stage = stage
     self.overlay = overlay
     self.settings = settings
+    moonHandle = MoonHandle(moon: moon, overlay: overlay, settings: settings)
+    stage.draggables.append(moonHandle)
     limits.onTransition = { [weak self] _, _, _ in
       guard let self else { return }
       self.stage.noteActivity()
@@ -266,8 +352,11 @@ final class LimitsHUD {
     }
     if let id = overlay.mainDisplayID, let scene = overlay.overlays[id]?.scene {
       if moon.parent !== scene { scene.addChild(moon) }
-      moon.position = CGPoint(
-        x: scene.size.width - 80, y: scene.size.height - 90)
+      if !moonHandle.isDragging {
+        moon.position =
+          moonHandle.storedPosition(in: scene)
+          ?? CGPoint(x: scene.size.width - 80, y: scene.size.height - 90)
+      }
       moon.update(seven, now: now)
       moon.isHidden = moon.isHidden || stage.actors.isEmpty
     }

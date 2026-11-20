@@ -60,6 +60,11 @@ final class Stage {
   private var lastPointer = CGPoint.zero
   private var badges: [CGDirectDisplayID: SKShapeNode] = [:]
 
+  /// Extra hover/drag targets (moon, items). Avatars win when both are under the pointer.
+  var draggables: [Draggable] = []
+  private var hoveredDraggable: Draggable?
+  private var draggingOther: Draggable?
+
   // Dragging
   private var dragging: Actor?
   private var dragOffset = CGPoint.zero
@@ -379,6 +384,7 @@ final class Stage {
     if actors.values.contains(where: { rect($0).insetBy(dx: -300, dy: -300).contains(p) }) {
       noteActivity()
     }
+    updateDraggableHover(p)
     updateMouseTransparency(p)
     guard dragging == nil else { return }
     let s = settings.settings
@@ -409,8 +415,21 @@ final class Stage {
 
   private func updateMouseTransparency(_ p: CGPoint) {
     let over = actors.values.contains { $0.visible && rect($0).insetBy(dx: -4, dy: -4).contains(p) }
-    let capture = dragging != nil || over
+    let overOther = draggables.contains { $0.hitRect.insetBy(dx: -4, dy: -4).contains(p) }
+    let capture = dragging != nil || draggingOther != nil || over || overOther
     overlay.overlays.values.forEach { $0.panel.ignoresMouseEvents = !capture }
+  }
+
+  private func draggable(at p: CGPoint) -> Draggable? {
+    draggables.last { $0.hitRect.contains(p) }
+  }
+
+  private func updateDraggableHover(_ p: CGPoint) {
+    let over = draggingOther ?? draggable(at: p)
+    guard over !== hoveredDraggable else { return }
+    hoveredDraggable?.pointerExited()
+    hoveredDraggable = over
+    over?.pointerEntered()
   }
 
   private func dodge(_ a: Actor, to origin: CGPoint) {
@@ -484,7 +503,13 @@ final class Stage {
       let a = actors.values.filter({ $0.visible && rect($0).contains(p) }).max(by: {
         $0.order < $1.order
       })
-    else { return }
+    else {
+      if let d = draggable(at: p) {
+        draggingOther = d
+        d.dragBegan(at: p)
+      }
+      return
+    }
     dragging = a
     dragOffset = CGPoint(x: p.x - a.origin.x, y: p.y - a.origin.y)
     physics = DragPhysics()
@@ -500,6 +525,11 @@ final class Stage {
   }
 
   func mouseDragged(_ p: CGPoint) {
+    if let d = draggingOther {
+      noteActivity()
+      d.dragMoved(to: p)
+      return
+    }
     guard let a = dragging else { return }
     let now = Date()
     let dt = now.timeIntervalSince(lastDragTime)
@@ -516,6 +546,13 @@ final class Stage {
   }
 
   func mouseUp(_ p: CGPoint) {
+    if let d = draggingOther {
+      draggingOther = nil
+      d.dragEnded(at: p)
+      updateDraggableHover(p)
+      updateMouseTransparency(p)
+      return
+    }
     guard let a = dragging else { return }
     dragging = nil
     let v = physics.release()
@@ -548,13 +585,25 @@ extension Stage {
   /// same code path real mouse events use, in 30 steps, then lets go.
   func debugDragFirst(to target: CGPoint) {
     guard let a = actors.values.min(by: { $0.order < $1.order }) else { return }
-    let start = CGPoint(x: a.origin.x + 100, y: a.origin.y + 60)
+    debugDrag(from: CGPoint(x: a.origin.x + 100, y: a.origin.y + 60), to: target)
+  }
+
+  /// CLAUDETTE_DEBUG_MOONDRAG: drags the first visible draggable (the moon) to `target`.
+  func debugDragFirstDraggable(to target: CGPoint) {
+    guard let d = draggables.first(where: { !$0.hitRect.isNull }) else { return }
+    debugDrag(from: CGPoint(x: d.hitRect.midX, y: d.hitRect.midY), to: target)
+  }
+
+  private func debugDrag(from start: CGPoint, to target: CGPoint) {
+    pointerMoved(start)
     mouseDown(start)
     for i in 1...30 {
       let t = CGFloat(i) / 30
       DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.02) { [self] in
-        mouseDragged(
-          CGPoint(x: start.x + (target.x - start.x) * t, y: start.y + (target.y - start.y) * t))
+        let p = CGPoint(
+          x: start.x + (target.x - start.x) * t, y: start.y + (target.y - start.y) * t)
+        pointerMoved(p)
+        mouseDragged(p)
       }
     }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [self] in mouseUp(target) }
