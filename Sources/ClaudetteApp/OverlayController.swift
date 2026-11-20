@@ -52,9 +52,22 @@ final class OverlayController {
     return overlays.keys.sorted().first
   }
 
+  /// Focus mode hides every overlay (and stops rendering) without losing any state.
+  var focusHidden = false {
+    didSet {
+      guard focusHidden != oldValue else { return }
+      for o in overlays.values {
+        if focusHidden { o.panel.orderOut(nil) } else { o.panel.orderFrontRegardless() }
+        o.view.isPaused = focusHidden || paused
+      }
+    }
+  }
+  private var paused = false
+
   /// Pauses rendering when there is nothing to draw.
   func setPaused(_ paused: Bool) {
-    overlays.values.forEach { $0.view.isPaused = paused }
+    self.paused = paused
+    overlays.values.forEach { $0.view.isPaused = paused || focusHidden }
   }
 
   @objc private func screensChanged() {

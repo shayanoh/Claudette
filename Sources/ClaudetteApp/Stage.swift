@@ -245,7 +245,13 @@ final class Stage {
 
   func settingsChanged() {
     actors.values.forEach { $0.puppet.setScale(scale) }
+    overlay.focusHidden = settings.settings.focusMode
     relayout()
+  }
+
+  /// The app's own setting or the system-wide Reduce Motion preference.
+  var reduceMotion: Bool {
+    settings.settings.reduceMotion || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
   }
 
   private func screensChanged() {
@@ -340,7 +346,7 @@ final class Stage {
       let r = rect(a)
       let inside = r.contains(p)
       var cornered = false
-      if s.dodgeEnabled && !modifiers.contains(.option) && !a.isDodging
+      if s.dodgeEnabled && !reduceMotion && !modifiers.contains(.option) && !a.isDodging
         && Date().timeIntervalSince(a.lastDodge) > 0.35
       {
         let others = actors.values.filter { $0 !== a && $0.visible }.map(rect)
@@ -356,7 +362,7 @@ final class Stage {
       setFade(
         a,
         on: inside && s.hoverFadeEnabled
-          && (!s.dodgeEnabled || cornered || modifiers.contains(.option)))
+          && (!s.dodgeEnabled || reduceMotion || cornered || modifiers.contains(.option)))
       trackPetting(a, inside: inside, at: p)
     }
   }

@@ -282,6 +282,9 @@ final class LimitsHUD {
 
   private func celebrate() {
     for a in stage.actors.values { a.puppet.happy() }
+    if settings.settings.reduceMotion || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+      return
+    }
     for o in overlay.overlays.values { Self.confetti(in: o.scene) }
   }
 
