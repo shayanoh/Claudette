@@ -263,6 +263,82 @@ final class PuppetNode: SKNode {
       ]))
   }
 
+  var isAsleep: Bool { asleep }
+
+  /// Local-space area she occupies (body, arms, legs, shadow); the spark above is not clickable.
+  static let hitBounds = CGRect(x: -104, y: -6, width: 208, height: 134)
+
+  // MARK: Reactions to the pointer
+
+  /// Picked up: stretches, legs dangle and swing.
+  func grab() {
+    asleep = false
+    removeAction(forKey: "z")
+    eyes.forEach { $0.yScale = 1 }
+    bodyPivot.removeAction(forKey: "breathe")
+    bodyPivot.run(
+      .group([.scaleX(to: 0.93, duration: 0.12), .scaleY(to: 1.1, duration: 0.12)]), withKey: "grab"
+    )
+    shadow.run(.scale(to: 0.7, duration: 0.12), withKey: "grab")
+    for (i, leg) in legs.enumerated() {
+      let swing = SKAction.sequence([
+        .rotate(toAngle: 0.3 * (i % 2 == 0 ? 1 : -1), duration: 0.18),
+        .rotate(toAngle: -0.3 * (i % 2 == 0 ? 1 : -1), duration: 0.18),
+      ])
+      leg.run(.repeatForever(swing), withKey: "dangle")
+    }
+  }
+
+  /// Sways opposite to the horizontal motion while being carried.
+  func carry(velocityX: CGFloat) {
+    let target = max(-0.3, min(0.3, -velocityX * 0.0004))
+    run(.rotate(toAngle: target, duration: 0.08), withKey: "carry")
+  }
+
+  /// Set down: squash, bounce and shake it off.
+  func drop() {
+    legs.forEach {
+      $0.removeAction(forKey: "dangle")
+      $0.run(.rotate(toAngle: 0, duration: 0.1))
+    }
+    shadow.run(.scale(to: 1, duration: 0.15), withKey: "grab")
+    run(.rotate(toAngle: 0, duration: 0.12), withKey: "carry")
+    bodyPivot.run(
+      .sequence([
+        .group([.scaleX(to: 1.12, duration: 0.08), .scaleY(to: 0.82, duration: 0.08)]),
+        .group([.scaleX(to: 0.97, duration: 0.1), .scaleY(to: 1.06, duration: 0.1)]),
+        .group([.scaleX(to: 1, duration: 0.1), .scaleY(to: 1, duration: 0.1)]),
+      ])
+    ) { [weak self] in self?.idle() }
+  }
+
+  /// A quick hop used when she side-steps the pointer.
+  func hop() {
+    bodyPivot.run(
+      .sequence([
+        .group([.scaleX(to: 0.92, duration: 0.07), .scaleY(to: 1.12, duration: 0.07)]),
+        .group([.scaleX(to: 1, duration: 0.12), .scaleY(to: 1, duration: 0.12)]),
+      ]), withKey: "hop")
+    run(
+      .sequence([.moveBy(x: 0, y: 14, duration: 0.12), .moveBy(x: 0, y: -14, duration: 0.14)]),
+      withKey: "hopLift")
+  }
+
+  /// Happy wiggle (petted, task done).
+  func happy() {
+    eyes.forEach {
+      $0.run(
+        .sequence([
+          .scaleY(to: 0.35, duration: 0.1), .wait(forDuration: 0.8), .scaleY(to: 1, duration: 0.1),
+        ]))
+    }
+    let wiggle = SKAction.sequence([
+      .rotate(toAngle: 0.08, duration: 0.1), .rotate(toAngle: -0.08, duration: 0.1),
+    ])
+    run(
+      .sequence([.repeat(wiggle, count: 3), .rotate(toAngle: 0, duration: 0.1)]), withKey: "happy")
+  }
+
   /// The tappable area in the parent's coordinates (body, legs, arms and spark).
   var hitFrame: CGRect { calculateAccumulatedFrame() }
 }

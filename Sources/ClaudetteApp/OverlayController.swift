@@ -1,10 +1,22 @@
 import AppKit
 import SpriteKit
 
+enum MousePhase { case down, dragged, up }
+
 /// A borderless, transparent, click-through panel that never takes focus.
 final class OverlayPanel: NSPanel {
   override var canBecomeKey: Bool { false }
   override var canBecomeMain: Bool { false }
+}
+
+/// Forwards clicks and drags (as global screen coordinates) to the stage.
+final class StageView: SKView {
+  var handler: ((MousePhase, CGPoint) -> Void)?
+  override var acceptsFirstResponder: Bool { false }
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+  override func mouseDown(with event: NSEvent) { handler?(.down, NSEvent.mouseLocation) }
+  override func mouseDragged(with event: NSEvent) { handler?(.dragged, NSEvent.mouseLocation) }
+  override func mouseUp(with event: NSEvent) { handler?(.up, NSEvent.mouseLocation) }
 }
 
 /// One overlay panel (hosting one SpriteKit scene) per display, visible on every Space and over
@@ -12,12 +24,15 @@ final class OverlayPanel: NSPanel {
 final class OverlayController {
   struct Overlay {
     let panel: OverlayPanel
-    let view: SKView
+    let view: StageView
     let scene: SKScene
   }
 
   private(set) var overlays: [CGDirectDisplayID: Overlay] = [:]
   var onScreensChanged: (() -> Void)?
+  var mouseHandler: ((MousePhase, CGPoint) -> Void)? {
+    didSet { overlays.values.forEach { $0.view.handler = mouseHandler } }
+  }
 
   init() {
     rebuild()
@@ -30,11 +45,16 @@ final class OverlayController {
     screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
   }
 
-  var mainScene: SKScene? {
-    if let main = NSScreen.main, let id = Self.displayID(of: main), let o = overlays[id] {
-      return o.scene
+  var mainDisplayID: CGDirectDisplayID? {
+    if let main = NSScreen.main, let id = Self.displayID(of: main), overlays[id] != nil {
+      return id
     }
-    return overlays.values.first?.scene
+    return overlays.keys.sorted().first
+  }
+
+  /// Pauses rendering when there is nothing to draw.
+  func setPaused(_ paused: Bool) {
+    overlays.values.forEach { $0.view.isPaused = paused }
   }
 
   @objc private func screensChanged() {
@@ -72,11 +92,13 @@ final class OverlayController {
     panel.isOpaque = false
     panel.backgroundColor = .clear
     panel.hasShadow = false
-    panel.ignoresMouseEvents = true
+    panel.ignoresMouseEvents = true  // switched off only while the pointer is over a sprite
+    panel.acceptsMouseMovedEvents = true
     panel.hidesOnDeactivate = false
     panel.isReleasedWhenClosed = false
 
-    let view = SKView(frame: CGRect(origin: .zero, size: screen.frame.size))
+    let view = StageView(frame: CGRect(origin: .zero, size: screen.frame.size))
+    view.handler = mouseHandler
     view.allowsTransparency = true
     view.preferredFramesPerSecond = 30
     view.ignoresSiblingOrder = true
