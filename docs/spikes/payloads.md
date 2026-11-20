@@ -38,6 +38,8 @@ Headless (`-p`) mode only so far; interactive-only behaviour is listed under "No
 - **Real mouse dragging works** (confirmed by the user, 2026-11-20): click, drag and drop on a character reach the
   overlay panel (so transparent-pixel pass-through and focus handling are fine on macOS 15.7).
 
+- **Visible over true full-screen apps** (confirmed by the user, 2026-11-20).
+
 ## Not yet confirmed (need an interactive session or a forced failure)
 
 - `SessionStart` did **not** arrive in `-p` mode (SessionStore must auto-create sessions from any event; it does).

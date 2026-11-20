@@ -28,7 +28,8 @@ See `README.md` for the vision, `docs/architecture.md` for how it fits together.
   consent; test installers with `CLAUDETTE_HOME=<scratch dir>` (see `docs/architecture.md`).
 - Dev switches are environment variables (`CLAUDETTE_DEBUG_*`), listed in `docs/architecture.md`.
 - Verified by the user on real hardware (2026-11-20): dragging with the real mouse, and live usage limits
-  from a real interactive session. Still unverified: display unplug/replug, true full-screen apps, 30-min soak.
+  from a real interactive session, and showing over true full-screen apps. Still unverified: display
+  unplug/replug, 30-min soak.
 - Synthetic mouse clicks are blocked without Accessibility permission for the harness; moves work.
   `CLAUDETTE_DEBUG_DRAGTEST` exercises the drag code path instead.
 - Swift is formatted with `swift format -i`; validate all external input.
