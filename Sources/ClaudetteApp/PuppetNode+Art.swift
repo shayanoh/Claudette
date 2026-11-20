@@ -111,15 +111,14 @@ extension PuppetNode {
   /// Idempotent; art pieces that are missing from the export are simply left out.
   func setSleepDepth(_ d: SleepDepth) {
     guard d != sleepDepth else { return }
+    clearSleepScene()
     sleepDepth = d
-    for n in ["blanket", "night", "moonNew", "twinkle"] {
-      for node in children + bodyPivot.children where node.name == n { node.removeFromParent() }
-    }
     guard d != .awake else {
       idle()
       return
     }
     sleep()
+    setPose(.stand)  // a curled pose from deep sleep must not outlive it (deep to nap)
     guard let lib = ArtLibrary.shared else {
       if d == .deep { breatheSlowly() }
       return
@@ -156,6 +155,15 @@ extension PuppetNode {
             .wait(forDuration: Double(i) * 0.4),
             .fadeAlpha(to: 0.2, duration: 1.1), .fadeAlpha(to: 1, duration: 1.1),
           ])))
+    }
+  }
+
+  /// Removes the blanket, night patch, moon and stars and forgets the depth. `idle()` calls this, so
+  /// anything that wakes her (drag, prompt, wake-up) lets the next `LimitsHUD.refresh` restore the scene.
+  func clearSleepScene() {
+    sleepDepth = .awake
+    for n in ["blanket", "night", "moonNew", "twinkle"] {
+      for node in children + bodyPivot.children where node.name == n { node.removeFromParent() }
     }
   }
 

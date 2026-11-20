@@ -207,6 +207,7 @@ final class PuppetNode: SKNode {
   func idle() {
     asleep = false
     removeAction(forKey: "z")
+    clearSleepScene()
     eyes.forEach { $0.yScale = 1 }
     setEyes(.open)
     setMouth(nil)
@@ -245,7 +246,11 @@ final class PuppetNode: SKNode {
         .group([.scaleX(to: 0.95, duration: 0.18), .scaleY(to: 1.1, duration: 0.18)]),
         .group([.scaleX(to: 1.0, duration: 0.14), .scaleY(to: 1.0, duration: 0.14)]),
       ])
-    ) { [weak self] in self?.idle() }
+    ) { [weak self] in
+      // A limit sleep scene applied while she was waking up must not be undone by the wake-up.
+      guard let self, self.sleepDepth == .awake else { return }
+      self.idle()
+    }
   }
 
   /// Eyes shut, slow breathing and floating z's.
@@ -351,6 +356,7 @@ final class PuppetNode: SKNode {
 
   /// Happy wiggle (petted, task done).
   func happy() {
+    guard !asleep else { return }  // petting a sleeper must not open her eyes or leave a smile
     if usesArt {
       setEyes(.happy)
       setMouth(.smile)
