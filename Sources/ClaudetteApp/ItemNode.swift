@@ -20,6 +20,8 @@ final class ItemNode: SKNode, Draggable {
   private var tip: SKNode?
 
   static let footprint = CGSize(width: 64, height: 80)
+  /// Room an item takes when scattering: wide enough that neighbouring captions do not collide.
+  static let spacing = CGSize(width: 104, height: 80)
 
   init(id: ItemID, scene: ToolScene, display: CGDirectDisplayID, privacy: Bool, uiScale: CGFloat) {
     itemID = id

@@ -454,7 +454,8 @@ final class Stage {
         a,
         on: inside && s.hoverFadeEnabled
           && (!s.dodgeEnabled || reduceMotion || cornered || modifiers.contains(.option)))
-      a.puppet.setNameTag(inside && !a.projectName.isEmpty ? a.projectName : nil)
+      a.puppet.setNameTag(
+        inside && s.showProjectName && !a.projectName.isEmpty ? a.projectName : nil)
       trackPetting(a, inside: inside, at: p)
     }
   }

@@ -12,6 +12,10 @@ public struct ClaudetteSettings: Codable, Equatable, Sendable {
   public var launchAtLogin = false
   /// She may sit on the top edge of other windows.
   public var perchEnabled = true
+  /// Hovering a Claudette shows her project (folder or worktree) under her.
+  public var showProjectName = true
+  /// Most items allowed on screen at once; beyond it the oldest resting ones are swept away.
+  public var itemCap = 80
   /// Where the weekly moon was dropped, as a fraction (0...1) of the main display's visible frame;
   /// nil means its default corner. Both are set or both are nil.
   public var moonX: Double?
@@ -36,6 +40,8 @@ public struct ClaudetteSettings: Codable, Equatable, Sendable {
     reduceMotion = value(.reduceMotion, d.reduceMotion)
     launchAtLogin = value(.launchAtLogin, d.launchAtLogin)
     perchEnabled = value(.perchEnabled, d.perchEnabled)
+    showProjectName = value(.showProjectName, d.showProjectName)
+    itemCap = value(.itemCap, d.itemCap)
     moonX = (try? c.decodeIfPresent(Double.self, forKey: .moonX)) ?? nil
     moonY = (try? c.decodeIfPresent(Double.self, forKey: .moonY)) ?? nil
   }
@@ -49,6 +55,7 @@ public struct ClaudetteSettings: Codable, Equatable, Sendable {
     s.scale = fit(scale, 0.5...2.0, 1.0)
     s.hoverFadeOpacity = fit(hoverFadeOpacity, 0.2...0.3, 0.25)
     s.shyness = fit(shyness, 0...1, 0.5)
+    s.itemCap = min(120, max(20, itemCap))
     if let x = moonX, let y = moonY, x.isFinite, y.isFinite {
       s.moonX = min(1, max(0, x))
       s.moonY = min(1, max(0, y))

@@ -131,3 +131,20 @@ private func freshDefaults() -> UserDefaults {
   d.set(Data(#"{"perchEnabled":false}"#.utf8), forKey: SettingsStore.key)
   #expect(!SettingsStore(defaults: d).settings.perchEnabled)
 }
+
+@Test func itemCapIsClampedTo20Through120() {
+  var s = ClaudetteSettings()
+  #expect(s.itemCap == 80)
+  s.itemCap = 5
+  #expect(s.clamped().itemCap == 20)
+  s.itemCap = 5000
+  #expect(s.clamped().itemCap == 120)
+}
+
+@Test func projectNameOnHoverDefaultsOnAndOldSettingsKeepIt() {
+  #expect(ClaudetteSettings().showProjectName)
+  let d = freshDefaults()
+  d.set(Data(#"{"scale":1.2}"#.utf8), forKey: SettingsStore.key)
+  let s = SettingsStore(defaults: d).settings
+  #expect(s.showProjectName && s.itemCap == 80)
+}

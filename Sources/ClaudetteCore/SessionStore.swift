@@ -18,6 +18,19 @@ public struct ToolActivity: Equatable, Sendable {
   public let isBackground: Bool
   /// Set for tool calls made inside a sub-agent.
   public var agentID: String? = nil
+
+  public init(
+    toolUseID: String, toolName: String, mcpServer: String? = nil, input: JSONValue? = nil,
+    startedAt: Date, isBackground: Bool = false, agentID: String? = nil
+  ) {
+    self.toolUseID = toolUseID
+    self.toolName = toolName
+    self.mcpServer = mcpServer
+    self.input = input
+    self.startedAt = startedAt
+    self.isBackground = isBackground
+    self.agentID = agentID
+  }
 }
 
 /// How a tool call ended; `summary` is at most the last 200 characters of its output or error.

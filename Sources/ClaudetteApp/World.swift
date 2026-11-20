@@ -22,29 +22,13 @@ final class World {
     guard let parent = stage.actors[session] else { return }
     // A tool call inside a sub-agent is that little actor's work, not the parent's.
     let actor = tool.agentID.flatMap { parent.subs[$0] } ?? parent
-    let scene = SceneMapper.scene(for: tool, now: Date())
-    guard
-      let touched = model.touch(for: session, tool: tool, scene: scene, cwd: cwd, now: Date())
-    else { return }
-    touched.evicted.forEach { remove($0) }
-    var item = touched.item
-    if item.position == nil || nodes[item.id] == nil {
-      let feet = stage.feet(of: actor)
-      let side: CGFloat = Bool.random(using: &rng) ? 1 : -1
-      let spot = Scatter.spot(
-        near: CGPoint(x: feet.x + side * 150 * stage.scale, y: feet.y + 30),
-        existing: model.all.filter { $0.id != item.id }.compactMap(\.position),
-        itemSize: ItemNode.footprint, screens: stage.screenFrames, seed: rng.next())
-      let display = stage.display(at: spot) ?? actor.display
-      model.move(item.id, to: spot, display: display)
-      item = model.item(item.id) ?? item
-      makeNode(item, scene: scene, at: spot, display: display)
-    } else {
-      nodes[item.id]?.pop()
+    guard let placed = materialize(for: actor, session: session, tool: tool, cwd: cwd) else {
+      return
     }
+    let (item, isNew, scene) = placed
     let move = Brain.move(for: scene)
     let intents = brain.plan(
-      event: .toolStarted(item, isNew: touched.isNew, move: move), actor: brainActor(actor),
+      event: .toolStarted(item, isNew: isNew, move: move), actor: brainActor(actor),
       world: model.all, screens: stage.screenFrames, rng: &rng)
     actor.task = (item.id, move)
     run(intents, for: actor)
@@ -211,6 +195,51 @@ final class World {
     node.moveToDisplay(stage.display(at: c) ?? node.display)
     let o = node.originOfDisplay(node.display)
     return (c, CGPoint(x: c.x - o.x, y: c.y - o.y))
+  }
+
+  /// Records the touch in the model and, for something new, puts an item on the screen by `actor`.
+  private func materialize(for actor: Actor, session: String, tool: ToolActivity, cwd: String?)
+    -> (item: Item, isNew: Bool, scene: ToolScene)?
+  {
+    let scene = SceneMapper.scene(for: tool, now: Date())
+    model.hardCap = stage.settings.settings.itemCap
+    guard
+      let touched = model.touch(for: session, tool: tool, scene: scene, cwd: cwd, now: Date())
+    else { return nil }
+    touched.evicted.forEach { remove($0) }
+    var item = touched.item
+    if item.position == nil || nodes[item.id] == nil {
+      let feet = stage.feet(of: actor)
+      let side: CGFloat = Bool.random(using: &rng) ? 1 : -1
+      let spot = Scatter.spot(
+        near: CGPoint(x: feet.x + side * 150 * stage.scale, y: feet.y + 30),
+        existing: model.all.filter { $0.id != item.id }.compactMap(\.position),
+        itemSize: ItemNode.spacing, screens: stage.screenFrames, seed: rng.next())
+      let display = stage.display(at: spot) ?? actor.display
+      model.move(item.id, to: spot, display: display)
+      item = model.item(item.id) ?? item
+      makeNode(item, scene: scene, at: spot, display: display)
+    } else {
+      nodes[item.id]?.pop()
+    }
+    return (item, touched.isNew, scene)
+  }
+
+  /// CLAUDETTE_DEBUG_CLUTTER: leaves `count` files and terminals around the first Claudette.
+  func debugClutter(_ count: Int) {
+    guard let actor = stage.actors.values.min(by: { $0.order < $1.order }) else { return }
+    for i in 0..<max(0, min(count, 500)) {
+      let isShell = i % 5 == 0
+      let tool = ToolActivity(
+        toolUseID: "debug-clutter-\(i)", toolName: isShell ? "Bash" : "Read", mcpServer: nil,
+        input: .object(
+          isShell
+            ? ["command": .string("make build-\(i)")]
+            : ["file_path": .string("/debug/src/file\(i).swift")]),
+        startedAt: Date(), isBackground: false)
+      _ = materialize(for: actor, session: actor.sessionID, tool: tool, cwd: "/debug")
+    }
+    stage.noteActivity()
   }
 
   func toolResult(toolUseID: String, result: ToolResult) {

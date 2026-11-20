@@ -223,6 +223,27 @@ struct SettingsView: View {
       }
 
       Section {
+        Toggle(isOn: binding(\.showProjectName)) {
+          Text("Show project name")
+          Text("Hovering a Claudette shows which project she is working on.")
+        }
+        Toggle(isOn: binding(\.perchEnabled)) {
+          Text("Sit on windows")
+          Text("She may perch on the top edge of other windows, and tumbles if you move them.")
+        }
+        SliderRow(
+          title: "Clutter limit",
+          caption:
+            "Most files and tools left lying around at once. The oldest are swept away beyond it.",
+          value: Binding(
+            get: { Double(s.itemCap) },
+            set: { v in model.set { $0.itemCap = Int(v.rounded()) } }),
+          range: 20...120, minLabel: "20", maxLabel: "120", readout: "\(s.itemCap) items")
+      } header: {
+        SectionHeader(title: "Behaviour", symbol: "figure.walk")
+      }
+
+      Section {
         Toggle(isOn: binding(\.privacyMode)) {
           Text("Privacy mode")
           Text("Hide file, project and server names, for screen sharing.")

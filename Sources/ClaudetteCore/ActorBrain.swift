@@ -142,7 +142,7 @@ public struct Brain: Sendable {
     let aim = CGPoint(x: pos.x + dist * cos(angle), y: pos.y + dist * sin(angle))
     let spot = Scatter.spot(
       near: aim, existing: world.filter { $0.id != item.id }.compactMap(\.position),
-      itemSize: CGSize(width: 60, height: 60), screens: screens, seed: rng.next())
+      itemSize: CGSize(width: 104, height: 80), screens: screens, seed: rng.next())
     out.append(.toss(item.id, to: spot))
     return out
   }

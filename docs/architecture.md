@@ -30,6 +30,24 @@ Claude Code  ──hooks (http)──────────────┐
    sub-agents, approvals, errors) and `LimitsModel` (usage windows). The resulting
    `SessionChange` values drive `Stage`; limit transitions drive `LimitsHUD`.
 
+## The world (items, walking, perching)
+
+Items are objects of the stage, not props of a puppet. `ClaudetteCore` holds the rules, unit tested:
+`WorldModel` (items keyed by identity: a file is its absolute normalised path, so every session and
+sub-agent shares one item; a terminal is its `tool_use_id`; a skill is its name; owners, hard cap,
+eviction), `Scatter` (where a new item lands: near the actor, spacing, wider when crowded, always on a
+screen), `Brain` (events in, a short queue of `Intent`s out: walk, face, pick up, play, toss, put
+down, sit, fall), and `PerchPlanner` (which window top edge is free; when the window was pulled away).
+`ClaudetteApp` only animates: `World` owns the model, the `ItemNode`s and runs the intents (walking is
+a per-frame `customAction`), `Stage` positions actors (`feet(of:)`/`setFeet`), `WindowTracker` reads
+window bounds (no titles, no Screen Recording permission). Items materialise next to whoever
+touched them, stay until cleanup or the cap, and can be dragged (`ItemNode` is `Draggable`); she
+walks to wherever they are. Sub-agents are small `Actor`s tethered to their parent (`leash`).
+`SessionStore` supplies `isThinking` (she paces with a thought bubble) and `ToolResult`s (terminal
+hover text). Z order: with `ignoresSiblingOrder` SpriteKit sorts by global z, so each Claudette
+gets her own z band (`Stage.bringToFront`, 200 apart, sub-agents +100); drags, tooltips and
+confetti sit at `Stage.overlayZ`.
+
 ## Overlay targets
 
 `Draggable` (app) is the hit-test contract for anything on the overlay besides the avatars: `hitRect`
@@ -47,6 +65,8 @@ of the main display in settings). Item labels are drawn once per text by `LabelT
   reading after a rejection never counts as "lifted".
 - Both installers refuse to touch what is not theirs (foreign plugin directory, invalid settings
   JSON) and uninstall restores the original bytes when the file is unchanged since install.
+- Heavy-session check (2026-11-20, debug build, Intel i7): 80 items around one Claudette idle at
+  about 2.5% CPU and 51 MB.
 - Rendering pauses when nothing is on screen (0% CPU) and in Focus mode.
 
 ## Art pipeline
@@ -82,6 +102,8 @@ PNG's pixel size). The PNGs and manifest are committed, so building the app need
 | `APP_OUT=dir scripts/bundle.sh` | builds the app bundle somewhere other than `build/Claudette.app` |
 | `CLAUDETTE_DEBUG_MOONDRAG=1` | drags the moon (first `Draggable`) to the screen centre through the real code path |
 | `Claudette --render-props <png>` | draws every prop kind on a light and a dark backdrop (label legibility), then exits |
+| `CLAUDETTE_DEBUG_CLUTTER=N` | (with `CLAUDETTE_DEBUG_SPAWN=1`) leaves N files and terminals around the first Claudette |
+| `Claudette --render-overlap <png>` | two overlapping Claudettes (same z vs a band each), a thought bubble and a sub-agent |
 | `CLAUDETTE_DEBUG_DRAGTEST=1` | drags the first character across the screen using the real code path |
 | `CLAUDETTE_LOG_EVENTS=1` | logs raw payloads to `~/Library/Logs/Claudette/events.jsonl` (off by default: prompts) |
 | `CLAUDETTE_HOME=dir` | redirects every `~/.claude` and Application Support path (sandbox for testing) |

@@ -19,8 +19,15 @@ Both steps ask for confirmation first and show exactly which file they change.
 
 - One Claudette per Claude Code session, standing along the bottom of the screen on every desktop.
   More than six collapse into a `+N` pill.
-- Tool calls become props beside her (file read, search, edit, shell, web, skill, MCP cartridge with
-  the server name). Sub-agents appear as little copies in front of her.
+- Tool calls become items on the screen (file, search, shell, web, skill, MCP cartridge). She walks to
+  them, picks them up, works, and tosses them aside; they stay where they land. A file she touched
+  before is the *same* item (for every session and sub-agent), so she walks back to it. Terminals are
+  bigger and show the start of the command; hover for the full command and, when done, the result.
+  **Drag any item** and she follows it. A busy session leaves a lot lying around (the limit is in
+  Settings, "Clutter limit").
+- While Claude thinks she paces about with a thought bubble. Hover her to see her project name.
+  She may perch on a window's top edge, and tumbles if you move that window.
+- Sub-agents are little Claudettes that roam near her and do their own work.
 - `!` (amber, she waves) means a permission prompt is waiting; `?` (blue) means Claude asked a
   question; a red pill names an API, sign-in, billing or rate-limit error.
 - The jar on her shoulder is the 5-hour window (fill = what is left); the moon in the top-right is the

@@ -162,6 +162,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         model.stage.debugDragFirst(to: CGPoint(x: f.midX - 200, y: f.midY))
       }
     }
+    if let n = env["CLAUDETTE_DEBUG_CLUTTER"].flatMap({ Int($0) }) {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [model] in
+        model.stage.world.debugClutter(n)
+      }
+    }
     if env["CLAUDETTE_DEBUG_MOONDRAG"] != nil {
       DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [model] in
         let f = NSScreen.main?.frame ?? .zero
