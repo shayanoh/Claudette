@@ -24,6 +24,8 @@ final class SettingsModel: ObservableObject {
   let store: SettingsStore
   private let activeProjectDirs: () -> [String]
   @Published var pluginInstalled = false
+  /// The installed plugin still uses the old `http` hooks, which report errors when Claudette is closed.
+  @Published var pluginNeedsUpdate = false
   @Published var statusLine = InstallState.notInstalled
   @Published var message = ""
 
@@ -42,6 +44,7 @@ final class SettingsModel: ObservableObject {
 
   func refresh() {
     pluginInstalled = PluginInstaller.isInstalled(pluginDir: Paths.pluginDir)
+    pluginNeedsUpdate = PluginInstaller.isLegacy(pluginDir: Paths.pluginDir)
     var state = StatusLineInstaller.status(
       settingsURL: Paths.claudeSettings, wrapperPath: Paths.wrapper, projectSettingsURL: nil)
     if state == .installed {
@@ -86,6 +89,23 @@ final class SettingsModel: ObservableObject {
       message = "Plugin installed. Start a new Claude Code session to use it."
     } catch {
       message = "Could not install the plugin: \(error)"
+    }
+    refresh()
+  }
+
+  /// Rewrites our own plugin folder with the silent command hooks (never touches anything else).
+  func updatePlugin() {
+    guard
+      confirm(
+        "Update the Claude Code plugin?",
+        "The installed plugin reports an error in Claude Code whenever Claudette is not running. The update replaces its hooks with a small script that fails silently.\n\nOnly the folder\n\(Paths.pluginDir.path)\nis rewritten. New Claude Code sessions pick it up.",
+        button: "Update")
+    else { return }
+    do {
+      try PluginInstaller.install(pluginDir: Paths.pluginDir, port: Int(AppModel.feedPort))
+      message = "Plugin updated. Start a new Claude Code session to use it."
+    } catch {
+      message = "Could not update the plugin: \(error)"
     }
     refresh()
   }
