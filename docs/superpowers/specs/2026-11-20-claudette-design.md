@@ -32,6 +32,33 @@ glances at it to learn "needs me", "long shell running", or "limit hit" without 
    looks at the cursor when idle.
 8. Context window shown as a backpack that fills; compaction is her squashing it down.
 9. Menubar item mirrors state (moon phase + jar level glyph, status dot) for when she is hidden.
+10. **API errors and disconnects are shown** (user request). Server/API errors, authentication
+    or billing failures, and connection loss each get a distinct scene: unplugged cable with
+    sparks and a "no signal" cloud for disconnects, a cracked spark for API errors, a
+    locked-door sign for auth/billing, and a relieved sigh when it recovers. Sources:
+    StopFailure (matchers `rate_limit`, `authentication_failed`, `billing_error`,
+    `server_error`), `PostToolUseFailure`, auth-related Notifications, and transcript error
+    entries. Pure network disconnects may not surface in hooks at all; the spike decides what
+    can be detected, and undetectable cases are listed as known gaps rather than faked.
+11. **Size setting:** avatar scale slider (50% to 200%, default 100% = about 128 pt), applied
+    live, props and minis scale with it. Stored per user.
+12. **Hover fade (setting, default on):** while the pointer is over her or her props she fades
+    to about 25% opacity (configurable 20-30%) and returns when the pointer leaves, so she never
+    hides text. Can be switched off.
+13. **Drag and drop:** she can be picked up and moved anywhere with the mouse, with animation
+    for each phase: grab (surprised stretch, legs dangle and swing), carry (sway follows
+    motion), drop (squash, bounce, shake-off), a flick makes her slide with inertia and settle
+    with a skid. Dropped on a window title bar or screen edge she perches there when window
+    geometry is available. Her position is remembered per session.
+14. **Cursor play (setting, default on):** when the pointer approaches she may dodge: a quick
+    side-step, hop or slide to a nearby free spot, with a playful look back. Dodge distance,
+    speed and "shyness" are adjustable. If cornered she gives up and lets the pointer
+    hover; hovering still for a couple of seconds gets petted-happy reactions. Dodge and hover
+    fade are independent settings; when both are on, dodging is tried first and fade covers
+    the cases where she cannot move away.
+15. **Settings window** (from the menubar item): size, hover fade on/off and opacity, cursor
+    dodging on/off and shyness, privacy mode, Reduce Motion / Focus mode, launch at login,
+    install/uninstall the Claude Code plugin and status line wrapper.
 
 ## Non-goals (v1)
 
@@ -189,8 +216,18 @@ Per-project accent colour or scarf to tell sessions apart.
   Export contract, defined here and given to Opus in its brief: one @2x PNG per named part
   (`leg_0..3`, `arm_L/R`, `body`, `eye_L/R`, `mouth_*`, `spark`, `shadow`, props) plus a JSON
   manifest with anchor points and z-order.
-- **Distribution:** direct, notarised, non-sandboxed (loopback server and `settings.json`
-  edit make a sandboxed App Store build a non-starter). Minimum macOS 14.
+- **Distribution (user confirmed):** primarily for the user's own use, probably released
+  open source on GitHub (the user may change their mind later). There is no paid Apple
+  developer account, so there are no notarised builds: users get the source and build it
+  themselves (Xcode / `swift build`, ad-hoc signed). The README must document build and
+  first-run steps (including Gatekeeper). Non-sandboxed (loopback server and `settings.json`
+  edit make a sandboxed App Store build a non-starter). Minimum macOS 14. The user runs the
+  latest Claude Code and keeps it updated, so we target the current release and pin a
+  tested version range.
+- **Claude Code plugin (user confirmed):** the feed is installed as a Claude Code plugin.
+- **Pointer tracking:** a global mouse-moved monitor drives hover fade, dodging and
+  `ignoresMouseEvents` toggling (the panel takes mouse events only while the pointer is over
+  a sprite). Needs a quick check that this works without extra permissions.
 - **Status line wrapper:** edits user-level `~/.claude/settings.json` only, after explicit
   consent, with a backup and the original command stored by the app. No existing command:
   the wrapper only forwards. A project-level status line overrides the user-level one, so the
