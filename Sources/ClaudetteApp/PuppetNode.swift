@@ -41,6 +41,9 @@ final class PuppetNode: SKNode {
   var mouth: SKNode?
   /// Usage-limit sleep scene currently shown (see `setSleepDepth`).
   var sleepDepth: SleepDepth = .awake
+  /// Outfit for the current model and the per-project accent hue (see `setOutfit`, `setAccent`).
+  var outfit: ModelFamily = .other
+  var accentHue: Double?
   private var asleep = false
 
   override init() {

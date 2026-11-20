@@ -16,6 +16,7 @@ import parts as P  # noqa: E402
 import props as R  # noqa: E402
 import status as St  # noqa: E402
 import sleep as Sl  # noqa: E402
+import outfits as O  # noqa: E402
 
 BUILD = os.path.join(HERE, "build")
 EXPORT = os.path.join(HERE, "export")
@@ -50,7 +51,19 @@ PARTS = {
     "blanket": (Sl.blanket, "bodyPivot", (0, -2), 3),
     "blanket_deep": (Sl.blanket_deep, "bodyPivot", (0, -2), 3),
     "night_patch": (Sl.night_patch, "root", (0, -24), -50),
+    # Per-model outfits: hats sit on the body top at z 5 (above the face); body pieces at z 2,
+    # except Opus's cape, which hangs behind the body and the arms.
+    "outfit_opus_head": (O.outfit_opus_head, "bodyPivot", (-26, 97), 5),
+    "outfit_sonnet_head": (O.outfit_sonnet_head, "bodyPivot", (24, 97), 5),
+    "outfit_haiku_head": (O.outfit_haiku_head, "bodyPivot", (20, 97), 5),
+    "outfit_opus_body": (O.outfit_opus_body, "bodyPivot", (0, 0), -0.5),  # behind arms too
+    "outfit_sonnet_body": (O.outfit_sonnet_body, "bodyPivot", (0, 0), 2),
+    "outfit_haiku_body": (O.outfit_haiku_body, "bodyPivot", (0, 0), 2),
+    # Per-project scarf (tinted at runtime); the tail is separate so code can sway it.
+    "scarf": (O.scarf, "bodyPivot", O.SCARF_PIVOT, 2),
+    "scarf_tail": (O.scarf_tail, "bodyPivot", O.TAIL_AT, 2.5),
 }
+TINTED = {"scarf", "scarf_tail"}
 # Props whose anchor is [0.5, 0]: canvas bottom is the pivot, no margin below.
 FLUSH_BOTTOM = {"bag", "bag_fill", "jar_glass", "jar_fill", "jar_lid", "blanket", "blanket_deep", "night_patch"}
 
@@ -195,6 +208,8 @@ def export():
         else:
             _d, parent, pos, z = PARTS[name]
             a["z"] = z
+            if name in TINTED:
+                a["tint"] = True
             if parent:
                 a.update(parent=parent, position=list(pos))
         assets[name] = a
@@ -246,9 +261,11 @@ def image(a, uri, left, top, k=1, sy=1):
             f'preserveAspectRatio="none" href="{uri}"/>')
 
 
-def figure(assets, uris, names, cx, ground, k, swap=None, levels=None):
-    """Place sprites by the manifest (k = zoom). swap: base name -> variant texture."""
+def figure(assets, uris, names, cx, ground, k, swap=None, levels=None, filters=None):
+    """Place sprites by the manifest (k = zoom). swap: base name -> variant texture.
+    filters: name -> SVG filter id (used to simulate runtime tint)."""
     swap = swap or {}
+    filters = filters or {}
     levels = LEVEL if levels is None else levels
     placed = []
     for name in names:
@@ -259,14 +276,19 @@ def figure(assets, uris, names, cx, ground, k, swap=None, levels=None):
         sy = levels.get(name, 1)  # fills are yScaled about their bottom anchor
         top = ground - (y + (1 - a["anchor"][1]) * h * sy) * k
         # SpriteKit: higher global z on top; on ties a child draws after its parent.
-        placed.append((z, depth, name, image(a, uris[swap.get(name, name)], left, top, k, sy)))
+        img = image(a, uris[swap.get(name, name)], left, top, k, sy)
+        if name in filters:
+            img = img.replace("<image ", f'<image filter="url(#{filters[name]})" ', 1)
+        placed.append((z, depth, name, img))
     return "".join(s for *_k, s in sorted(placed))
 
 
 TINTS = ["#7FC8F8", "#FFC94D", "#E5484D"]  # sample runtime tints for the cartridge check
+SCARF_TINTS = ["#7FC8F8", "#9BE38B", "#F29BC0", "#B9A6E8", "#FFC94D"]  # sample project hues
 LEVEL = {"bag_fill": 0.55, "jar_fill": 0.6}  # sheet preview of the fill levels
 CHARACTER = [n for n in PARTS if n not in ("jar_glass", "jar_fill", "jar_lid", "moon_dark", "moon_lit",
-                                             "blanket", "blanket_deep", "night_patch")]
+                                             "blanket", "blanket_deep", "night_patch", "scarf", "scarf_tail")
+             and not n.startswith("outfit_")]
 POSES = [  # (hidden parts, swaps)
     ({"mouth", "bag", "bag_fill"}, {}),
     (set(), {"eye_L": "eye_L.happy", "eye_R": "eye_R.happy"}),
@@ -297,7 +319,8 @@ def sheet(manifest):
     tint_rows = math.ceil(len(tints) * len(TINTS) / tint_cols)
     props_h = (prop_rows + 1) * 2 * prop_cell + tint_rows * tint_cell
     scene_h = 340
-    H = pad + fig_h + pad + pose_h + pad + 2 * scene_h + pad + props_h + pad + rows * (ch + 40) + pad
+    outfit_rows = (230, 230, 190, 230)
+    H = (pad + fig_h + pad + pose_h + pad + 2 * scene_h + pad + sum(outfit_rows) + pad + props_h) + pad + rows * (ch + 40) + pad
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">',
          '<defs>'
          '<pattern id="lc" width="16" height="16" patternUnits="userSpaceOnUse">'
@@ -357,6 +380,27 @@ def sheet(manifest):
             lx, ly = pad + half * (1 if wx > 0 else 0) + half / 2 + a["label"][0] * sk, ground + 45 * sk - a["label"][1] * sk
             o.append(f'<rect x="{lx-40}" y="{ly-4}" width="80" height="8" rx="4" fill="#8A8FA3"/>')
     y += 2 * scene_h + pad
+    # Outfits: each model on light and dark, the scarf in 5 tints, then each outfit + scarf.
+    def mult(fid, c):
+        r, g, b = (int(c[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        return (f'<filter id="{fid}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" '
+                f'values="{r:.3f} 0 0 0 0 0 {g:.3f} 0 0 0 0 0 {b:.3f} 0 0 0 0 0 1 0"/></filter>')
+    o.append("<defs>" + "".join(mult(f"sc{i}", c) for i, c in enumerate(SCARF_TINTS)) + "</defs>")
+    base = [n for n in CHARACTER if n not in ("mouth", "bag", "bag_fill")]
+    models = ("opus", "sonnet", "haiku")
+    scarf = ["scarf", "scarf_tail"]
+    rows = [(bg, [(base + [f"outfit_{m}_head", f"outfit_{m}_body"], {}) for m in models], 1.0)
+            for bg in ("#EEF0F7", "#2A2F45")]
+    rows.append(("#E3E6F0", [(base + scarf, {n: f"sc{i}" for n in scarf}) for i in range(len(SCARF_TINTS))], 0.75))
+    rows.append(("#EEF0F7", [(base + [f"outfit_{m}_head", f"outfit_{m}_body"] + scarf,
+                              {n: f"sc{i}" for n in scarf}) for i, m in zip((0, 2, 3), models)], 1.0))
+    for (bg, figs, k), rh in zip(rows, outfit_rows):
+        o.append(f'<rect x="{pad}" y="{y}" width="{W-2*pad}" height="{rh}" fill="{bg}"/>')
+        step = (W - 2 * pad) / len(figs)
+        for i, (names_, filt) in enumerate(figs):
+            o.append(figure(assets, uris, names_, pad + step * (i + 0.5), y + rh - 30, k, filters=filt))
+        y += rh
+    y += pad
     # Props at 2x, each row on light then dark, with the label slot shown as a grey bar.
     def put(name, cx, cy, k, extra=""):
         a = assets[name]

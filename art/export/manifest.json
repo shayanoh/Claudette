@@ -574,6 +574,108 @@
       ],
       "z": -50
     },
+    "outfit_haiku_body": {
+      "anchor": [
+        0.451429,
+        0.475
+      ],
+      "file": "outfit_haiku_body.png",
+      "parent": "bodyPivot",
+      "position": [
+        0,
+        0
+      ],
+      "size": [
+        175,
+        40
+      ],
+      "z": 2
+    },
+    "outfit_haiku_head": {
+      "anchor": [
+        0.5,
+        0.181818
+      ],
+      "file": "outfit_haiku_head.png",
+      "parent": "bodyPivot",
+      "position": [
+        20,
+        97
+      ],
+      "size": [
+        42,
+        33
+      ],
+      "z": 5
+    },
+    "outfit_opus_body": {
+      "anchor": [
+        0.5,
+        0.11811
+      ],
+      "file": "outfit_opus_body.png",
+      "parent": "bodyPivot",
+      "position": [
+        0,
+        0
+      ],
+      "size": [
+        214,
+        127
+      ],
+      "z": -0.5
+    },
+    "outfit_opus_head": {
+      "anchor": [
+        0.5,
+        0.15625
+      ],
+      "file": "outfit_opus_head.png",
+      "parent": "bodyPivot",
+      "position": [
+        -26,
+        97
+      ],
+      "size": [
+        50,
+        32
+      ],
+      "z": 5
+    },
+    "outfit_sonnet_body": {
+      "anchor": [
+        0.5,
+        0.045977
+      ],
+      "file": "outfit_sonnet_body.png",
+      "parent": "bodyPivot",
+      "position": [
+        0,
+        0
+      ],
+      "size": [
+        158,
+        87
+      ],
+      "z": 2
+    },
+    "outfit_sonnet_head": {
+      "anchor": [
+        0.5,
+        0.2
+      ],
+      "file": "outfit_sonnet_head.png",
+      "parent": "bodyPivot",
+      "position": [
+        24,
+        97
+      ],
+      "size": [
+        60,
+        35
+      ],
+      "z": 5
+    },
     "prop_edit": {
       "anchor": [
         0.5,
@@ -852,6 +954,42 @@
         36,
         44
       ]
+    },
+    "scarf": {
+      "anchor": [
+        0.5,
+        0.541667
+      ],
+      "file": "scarf.png",
+      "parent": "bodyPivot",
+      "position": [
+        0,
+        20.0
+      ],
+      "size": [
+        170,
+        24
+      ],
+      "tint": true,
+      "z": 2
+    },
+    "scarf_tail": {
+      "anchor": [
+        0.428571,
+        0.888889
+      ],
+      "file": "scarf_tail.png",
+      "parent": "bodyPivot",
+      "position": [
+        60,
+        14
+      ],
+      "size": [
+        21,
+        36
+      ],
+      "tint": true,
+      "z": 2.5
     },
     "shadow": {
       "anchor": [

@@ -138,10 +138,18 @@ final class Stage {
       }
     }
     for (id, state) in sessions {
-      actors[id]?.puppet.setContext(
-        state.contextUsedPercentage, privacy: settings.settings.privacyMode)
+      guard let actor = actors[id] else { continue }
+      actor.puppet.setContext(state.contextUsedPercentage, privacy: settings.settings.privacyMode)
+      dress(actor.puppet, state: state)
+      for mini in actor.minis.values { dress(mini, state: state) }
     }
     updatePause()
+  }
+
+  /// Model outfit and project scarf colour, the same for a session's puppet and its minis.
+  private func dress(_ puppet: PuppetNode, state: SessionState) {
+    puppet.setOutfit(ModelFamily.from(displayName: state.model))
+    puppet.setAccent(hue: Accent.hue(forProject: state.cwd ?? ""))
   }
 
   /// Rendering stops only when nothing is on screen, including characters still leaving.

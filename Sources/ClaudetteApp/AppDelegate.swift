@@ -187,8 +187,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   @objc private func debugAdd() {
     debugCount += 1
+    // CLAUDETTE_DEBUG_MODELS=opus,sonnet,haiku gives spawned sessions those models in turn.
+    let models = (ProcessInfo.processInfo.environment["CLAUDETTE_DEBUG_MODELS"] ?? "")
+      .split(separator: ",").map(String.init)
+    let modelField =
+      models.isEmpty ? "" : #","model":"\#(models[(debugCount - 1) % models.count])""#
     model.inject(
-      #"{"hook_event_name":"SessionStart","session_id":"debug-\#(debugCount)","cwd":"/tmp/debug"}"#)
+      #"{"hook_event_name":"SessionStart","session_id":"debug-\#(debugCount)","cwd":"/tmp/debug/\#(debugCount)"\#(modelField)}"#
+    )
   }
 
   @objc private func debugEnd() {

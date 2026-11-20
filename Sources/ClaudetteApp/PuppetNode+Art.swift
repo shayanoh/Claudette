@@ -1,3 +1,4 @@
+import AppKit
 import ClaudetteCore
 import SpriteKit
 
@@ -162,5 +163,59 @@ extension PuppetNode {
     let slow = SKAction.sequence([.scaleY(to: 0.95, duration: 4), .scaleY(to: 0.99, duration: 4)])
     slow.timingMode = .easeInEaseOut
     bodyPivot.run(.repeatForever(slow), withKey: "breathe")
+  }
+}
+
+extension PuppetNode {
+  /// Dresses her for the current model (`.other` takes the outfit off). Idempotent; pieces the
+  /// export lacks are left out.
+  func setOutfit(_ family: ModelFamily) {
+    guard family != outfit else { return }
+    outfit = family
+    for node in bodyPivot.children where node.name == "outfit" { node.removeFromParent() }
+    guard let lib = ArtLibrary.shared, let key = Self.outfitKey(family) else { return }
+    for piece in ["head", "body"] {
+      guard let sprite = lib.sprite("outfit_\(key)_\(piece)") else { continue }
+      sprite.name = "outfit"
+      sprite.setScale(0.01)
+      bodyPivot.addChild(sprite)
+      sprite.run(.scale(to: 1, duration: 0.2))
+    }
+  }
+
+  private static func outfitKey(_ f: ModelFamily) -> String? {
+    switch f {
+    case .opus: return "opus"
+    case .sonnet: return "sonnet"
+    case .haiku: return "haiku"
+    case .other: return nil
+    }
+  }
+
+  /// Tints her scarf with the project's colour. Idempotent; a no-op without scarf art.
+  func setAccent(hue: Double) {
+    guard accentHue != hue, hue.isFinite, let lib = ArtLibrary.shared, lib.asset("scarf") != nil
+    else { return }
+    accentHue = hue
+    let color = NSColor(hue: CGFloat(hue), saturation: 0.55, brightness: 0.95, alpha: 1)
+    var scarf = bodyPivot.childNode(withName: "scarf") as? SKSpriteNode
+    if scarf == nil, let new = lib.sprite("scarf") {
+      bodyPivot.addChild(new)
+      scarf = new
+      if let tail = lib.sprite("scarf_tail") {
+        tail.name = "scarf_tail"
+        tail.colorBlendFactor = 1
+        tail.color = color
+        bodyPivot.addChild(tail)
+        let sway = SKAction.sequence([
+          .rotate(toAngle: 0.08, duration: 1.2), .rotate(toAngle: -0.08, duration: 1.2),
+        ])
+        sway.timingMode = .easeInEaseOut
+        tail.run(.repeatForever(sway), withKey: "sway")
+      }
+    }
+    scarf?.colorBlendFactor = 1
+    scarf?.color = color
+    (bodyPivot.childNode(withName: "scarf_tail") as? SKSpriteNode)?.color = color
   }
 }
