@@ -10,6 +10,19 @@ avatar that lives on your screen and acts out what Claude Code is doing.
 - Glanceable status: waiting for approval, Claude has a question, long-running shell, error.
 - Charm first, status second.
 
+## Build and run
+
+Requirements: macOS 14+, Xcode command line tools with Swift 6.
+
+```bash
+scripts/bundle.sh          # builds build/Claudette.app (ad-hoc signed, no notarisation)
+open build/Claudette.app   # menubar item appears, no Dock icon
+swift test                 # unit tests for ClaudetteCore
+```
+
+First run: the app is not notarised. If macOS blocks it, right-click `Claudette.app`, choose
+Open, and confirm. Claudette is built from source on purpose; there are no signed releases.
+
 ## Status
 
 Design phase. Nothing is built yet. See `docs/` for decisions and concept art.
