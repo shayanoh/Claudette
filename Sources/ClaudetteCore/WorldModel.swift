@@ -31,6 +31,16 @@ public struct ItemID: Hashable, Sendable {
   public static func skill(name: String) -> ItemID { ItemID(raw: "skill:" + name) }
 }
 
+/// One labelled thing we know about the tool call behind an item (shown in its detail window).
+public struct ItemFact: Equatable, Sendable {
+  public var label: String
+  public var value: String
+  public init(label: String, value: String) {
+    self.label = label
+    self.value = value
+  }
+}
+
 public enum TerminalState: Equatable, Sendable { case running, done, failed }
 
 public struct TerminalInfo: Equatable, Sendable {
@@ -49,6 +59,10 @@ public struct Item: Equatable, Sendable {
   public var position: CGPoint?
   public var display: UInt32?
   public var terminal: TerminalInfo?
+  /// The session folder this came from, the tool's name and what it was asked to do.
+  public var cwd: String? = nil
+  public var toolName: String = ""
+  public var facts: [ItemFact] = []
 }
 
 /// Everything lying around on screen, shared by all sessions. Pure data: no UI.
@@ -74,6 +88,44 @@ public struct WorldModel {
     var kind: ItemKind
     var label: String
     var terminal: TerminalInfo?
+    var facts: [ItemFact] = []
+  }
+
+  static let factLimit = 2000
+
+  /// What the tool call was asked to do, as labelled facts (values capped).
+  private static func facts(tool: ToolActivity, scene: ToolScene, path: String?) -> [ItemFact] {
+    func str(_ key: String) -> String? {
+      guard let v = tool.input?[key]?.stringValue, !v.isEmpty else { return nil }
+      return v.count > factLimit ? String(v.prefix(factLimit)) + "…" : v
+    }
+    var out: [ItemFact] = []
+    func add(_ label: String, _ value: String?) {
+      if let value { out.append(ItemFact(label: label, value: value)) }
+    }
+    switch scene {
+    case .read, .edit, .write: add("File", path)
+    case .shell(_, let background):
+      add("Command", str("command"))
+      add("Description", str("description"))
+      if let ms = tool.input?["timeout"]?.doubleValue, ms.isFinite, ms > 0 {
+        add("Timeout", "\(Int(min(ms, 1e9) / 1000)) s")
+      }
+      if background { add("Background", "yes") }
+    case .search:
+      add("Pattern", str("pattern"))
+      add("Path", str("path"))
+    case .web:
+      add("URL", str("url"))
+      add("Query", str("query"))
+      add("Prompt", str("prompt"))
+    case .skill(let name): add("Skill", name.isEmpty ? nil : name)
+    case .mcp(let server, let toolName):
+      add("Server", server)
+      add("Tool", toolName)
+    case .todo, .plan, .subagent, .other: break
+    }
+    return out
   }
 
   /// nil for a sub-agent spawn (it is an actor, not an item).
@@ -122,12 +174,17 @@ public struct WorldModel {
     if var existing = store[spec.id] {
       existing.owners.insert(session)
       existing.lastTouched = now
+      if existing.cwd == nil { existing.cwd = cwd }
       store[spec.id] = existing
       isNew = false
     } else {
       store[spec.id] = Item(
         id: spec.id, kind: spec.kind, label: spec.label, owners: [session], createdAt: now,
-        lastTouched: now, position: nil, display: nil, terminal: spec.terminal)
+        lastTouched: now, position: nil, display: nil, terminal: spec.terminal, cwd: cwd,
+        toolName: tool.toolName,
+        facts: Self.facts(
+          tool: tool, scene: scene,
+          path: tool.input?["file_path"]?.stringValue ?? tool.input?["notebook_path"]?.stringValue))
       isNew = true
     }
     let evicted = evict(keeping: spec.id)

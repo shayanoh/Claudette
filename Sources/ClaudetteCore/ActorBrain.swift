@@ -42,11 +42,17 @@ public struct BrainActor: Sendable {
   public var leash: CGFloat
   /// What she is heading to or working on, so a drag of that item can re-target her.
   public var task: (item: ItemID, move: Move)?
+  /// Where the other Claudettes' feet are, and how much room she gives them.
+  public var others: [CGPoint]
+  public var gap: CGFloat
 
   public init(
     position: CGPoint, holding: ItemID? = nil, isSubagent: Bool = false, anchor: CGPoint? = nil,
-    leash: CGFloat = 0, task: (item: ItemID, move: Move)? = nil
+    leash: CGFloat = 0, task: (item: ItemID, move: Move)? = nil, others: [CGPoint] = [],
+    gap: CGFloat = 0
   ) {
+    self.others = others
+    self.gap = gap
     self.position = position
     self.holding = holding
     self.isSubagent = isSubagent
@@ -102,14 +108,17 @@ public struct Brain: Sendable {
         return out + [.play(move)]
       }
       return out
-        + work(item, at: pos, move: move, here: here, world: world, screens: screens, rng: &rng)
+        + work(
+          item, at: pos, move: move, here: here, world: world, screens: screens,
+          others: actor.others, gap: actor.gap, rng: &rng)
     case .itemMoved(let id):
       guard let task = actor.task, task.item == id,
         let pos = world.first(where: { $0.id == id })?.position, pos.x.isFinite, pos.y.isFinite
       else { return [] }
       guard let item = world.first(where: { $0.id == id }) else { return [] }
       return work(
-        item, at: pos, move: task.move, here: here, world: world, screens: screens, rng: &rng)
+        item, at: pos, move: task.move, here: here, world: world, screens: screens,
+        others: actor.others, gap: actor.gap, rng: &rng)
     case .thinkingChanged(let on):
       guard on else { return [] }
       return wander(actor: actor, here: here, screens: screens, rng: &rng)
@@ -130,11 +139,16 @@ public struct Brain: Sendable {
   /// little way off (she holds it meanwhile, so a shy dodge carries it along).
   private func work(
     _ item: Item, at pos: CGPoint, move: Move, here: CGPoint, world: [Item], screens: [CGRect],
-    rng: inout some RandomNumberGenerator
+    others: [CGPoint], gap: CGFloat, rng: inout some RandomNumberGenerator
   ) -> [Intent] {
     var out: [Intent] = []
     if distance(here, pos) > reach {
-      out.append(.walk(to: fit(toward(pos, from: here, distance: standOff), screens)))
+      out.append(
+        .walk(
+          to: fit(
+            Separation.standSpot(
+              target: pos, from: here, standOff: standOff, avoiding: others, minGap: gap),
+            screens)))
     }
     out += [.face(pos), .pickUp(item.id), .play(move)]
     let angle = CGFloat.random(in: 0..<(2 * .pi), using: &rng)
@@ -158,7 +172,8 @@ public struct Brain: Sendable {
       let angle = CGFloat.random(in: 0..<(2 * .pi), using: &rng)
       let r = radius * CGFloat.random(in: 0.3...1, using: &rng)
       let p = CGPoint(x: center.x + r * cos(angle), y: center.y + r * sin(angle))
-      out.append(.walk(to: fit(p, screens)))
+      out.append(
+        .walk(to: fit(Separation.push(p, awayFrom: actor.others, minGap: actor.gap), screens)))
       out.append(.wait(TimeInterval.random(in: 0.8...2.2, using: &rng)))
     }
     return out
