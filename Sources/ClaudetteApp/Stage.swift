@@ -23,6 +23,8 @@ final class Actor {
   var wandering = false
   var projectName = ""
   var nextRoam = Date.distantPast
+  /// The window she is sitting on and the spot on its top edge.
+  var perch: (window: WindowFrame, spot: CGPoint)?
   /// What she is heading to or working on (lets a dragged item re-target her).
   var task: (item: ItemID, move: Move)?
   var lastPhase: SessionPhase = .idle
@@ -90,6 +92,7 @@ final class Stage {
   /// interleave their parts. Each gets a band of its own, wider than a puppet's internal z range
   /// (about -50...30); sub-agents sit 100 above their parent.
   private var topZ: CGFloat = 200
+  private var tickCount = 0
   /// Overlay things that must always be above every Claudette (a dragged item, tooltips, confetti).
   static let overlayZ: CGFloat = 100_000
   private(set) lazy var world = World(stage: self)
@@ -527,6 +530,8 @@ final class Stage {
   private func tick() {
     updateFrameRate()
     world.tickSubs()
+    tickCount += 1
+    if tickCount % 2 == 0 { world.tickPerch() }  // about 2 Hz
     let now = Date()
     var needsLayout = false
     for a in actors.values {

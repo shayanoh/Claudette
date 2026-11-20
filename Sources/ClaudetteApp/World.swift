@@ -67,7 +67,7 @@ final class World {
 
   /// She paces about while Claude thinks: one batch of legs, then another while it lasts.
   private func startWander(_ a: Actor) {
-    guard a.thinking, !stage.reduceMotion, !stage.isBeingDragged(a), !a.isDodging,
+    guard a.thinking, a.perch == nil, !stage.reduceMotion, !stage.isBeingDragged(a), !a.isDodging,
       a.puppet.action(forKey: "brain") == nil
     else { return }
     let intents = brain.plan(
@@ -103,6 +103,62 @@ final class World {
 
   /// How far a sub-agent strays from its parent.
   private var leash: CGFloat { 260 * stage.scale }
+
+  // MARK: Perching
+
+  private var windows: [WindowFrame] = []
+
+  /// About 2 Hz, only while somebody is wandering or sitting: a wandering Claudette may hop onto a
+  /// window's top edge; one that is sitting there gets the shock of her life if the window moves.
+  func tickPerch() {
+    guard stage.settings.settings.perchEnabled, !stage.reduceMotion else { return }
+    let candidates = stage.actors.values.filter { $0.perch != nil || $0.wandering }
+    guard !candidates.isEmpty else { return }
+    windows = WindowTracker.poll()
+    for a in candidates {
+      if let perch = a.perch {
+        if PerchPlanner.moved(perched: perch.window, spot: perch.spot, now: windows, tolerance: 6) {
+          run([.fall], for: a)
+        }
+      } else if !a.isDodging, !stage.isBeingDragged(a), Int.random(in: 0..<4, using: &rng) == 0,
+        let c = PerchPlanner.candidate(
+          near: stage.feet(of: a), windows: windows, screens: stage.screenFrames,
+          ownPID: ProcessInfo.processInfo.processIdentifier,
+          minSize: CGSize(width: 200, height: 120), reach: 220 * stage.scale)
+      {
+        run([.walk(to: c.spot), .sit(onWindow: c.window)], for: a)
+      }
+    }
+  }
+
+  private func sit(_ a: Actor, onWindow number: Int) {
+    guard let w = windows.first(where: { $0.number == number }) else { return }
+    a.perch = (w, stage.feet(of: a))
+    a.puppet.setPose(.sit)
+  }
+
+  /// Startled, then straight down to the floor row.
+  private func fall(_ a: Actor) -> SKAction {
+    let start = stage.feet(of: a)
+    let k = stage.scale * a.sizeFactor
+    let vf = stage.screen(a.display)?.visibleFrame ?? stage.screenFrames.first ?? .zero
+    let groundY = vf.minY + 24 + 6 * k  // the row the layout stands her on
+    let drop = max(0, start.y - groundY)
+    let duration = max(0.15, sqrt(Double(drop) / 1800))  // free fall
+    let fall = SKAction.customAction(withDuration: duration) { [weak self, weak a] _, t in
+      guard let self, let a else { return }
+      let u = CGFloat(t) / CGFloat(duration)
+      self.stage.setFeet(a, CGPoint(x: start.x, y: start.y - drop * u * u))
+    }
+    return .sequence([
+      .run { [weak a] in
+        a?.puppet.setPose(.stand)
+        a?.puppet.perform(.startled)
+      },
+      .wait(forDuration: 0.22), fall,
+      .run { [weak a] in a?.puppet.drop() },
+    ])
+  }
 
   // MARK: Carrying
 
@@ -263,6 +319,13 @@ final class World {
     a.puppet.removeAction(forKey: "brain")
     a.puppet.setWalking(false)
     a.wandering = wandering
+    // Any new activity means she hops down (a sit step puts her back up).
+    if a.perch != nil,
+      !intents.contains(where: { if case .sit = $0 { return true } else { return false } })
+    {
+      a.perch = nil
+      a.puppet.setPose(.stand)
+    }
     guard !intents.isEmpty else {
       a.task = nil
       return
@@ -284,7 +347,10 @@ final class World {
         steps.append(.run { [weak self, weak a] in if let a { self?.pickUp(a, id) } })
       case .putDown(let p):
         steps.append(.run { [weak self, weak a] in if let a { self?.putDownHeld(a, at: p) } })
-      case .face, .sit, .fall: break  // later tasks
+      case .sit(let n):
+        steps.append(.run { [weak self, weak a] in if let a { self?.sit(a, onWindow: n) } })
+      case .fall: steps.append(fall(a))
+      case .face: break
       }
     }
     steps.append(.run { [weak a] in a?.task = nil })
