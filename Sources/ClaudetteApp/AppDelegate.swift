@@ -23,6 +23,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       i.target = self
       menu.addItem(i)
     }
+    let sim = NSMenuItem(title: "Debug: simulate limits", action: nil, keyEquivalent: "")
+    let simMenu = NSMenu()
+    for (title, tag) in [
+      ("Fresh (5h 12%, week 18%)", 0), ("Low (5h 88%, week 71%)", 1), ("In limit (5h 100%)", 2),
+      ("Lifted (5h 3%)", 3), ("Unknown (no data)", 4),
+    ] {
+      let i = NSMenuItem(title: title, action: #selector(simulate(_:)), keyEquivalent: "")
+      i.target = self
+      i.tag = tag
+      simMenu.addItem(i)
+    }
+    sim.submenu = simMenu
+    menu.addItem(sim)
     menu.addItem(.separator())
     menu.addItem(
       NSMenuItem(
@@ -31,15 +44,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     item.menu = menu
     statusItem = item
 
+    model.hud.onGlyph = { [weak self] image in self?.statusItem?.button?.image = image }
     feed.title = model.start()
     if let n = ProcessInfo.processInfo.environment["CLAUDETTE_DEBUG_SPAWN"], let count = Int(n) {
       for _ in 0..<max(0, min(count, 12)) { debugAdd() }
+    }
+    if let seq = ProcessInfo.processInfo.environment["CLAUDETTE_DEBUG_LIMITS"] {
+      // e.g. "fresh,low,limit,lifted": one step every 4 seconds starting after 2 seconds
+      for (i, step) in seq.split(separator: ",").enumerated() {
+        let tag = ["fresh": 0, "low": 1, "limit": 2, "lifted": 3, "unknown": 4][String(step)] ?? 4
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2 + Double(i) * 4) { [weak self] in
+          let item = NSMenuItem()
+          item.tag = tag
+          self?.simulate(item)
+        }
+      }
     }
     if ProcessInfo.processInfo.environment["CLAUDETTE_DEBUG_DRAGTEST"] != nil {
       DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [model] in
         let f = NSScreen.main?.frame ?? .zero
         model.stage.debugDragFirst(to: CGPoint(x: f.midX - 200, y: f.midY))
       }
+    }
+  }
+
+  @objc private func simulate(_ sender: NSMenuItem) {
+    switch sender.tag {
+    case 0: model.simulateLimits(five: 12, seven: 18)
+    case 1: model.simulateLimits(five: 88, fiveResetIn: 47 * 60, seven: 71)
+    case 2: model.simulateLimits(five: 100, fiveResetIn: 3600, seven: 71)
+    case 3: model.simulateLimits(five: 3, seven: 71)
+    default: break
     }
   }
 

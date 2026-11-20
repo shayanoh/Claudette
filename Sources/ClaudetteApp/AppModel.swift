@@ -12,6 +12,8 @@ final class AppModel {
   let overlay = OverlayController()
   private(set) lazy var stage = Stage(overlay: overlay, settings: settings)
   private let pointer = PointerTracker()
+  private(set) lazy var hud = LimitsHUD(
+    limits: limits, stage: stage, overlay: overlay, settings: settings)
   private var server: FeedServer?
   private var timer: Timer?
   /// Raw payload logging is off by default (it can contain prompts); set CLAUDETTE_LOG_EVENTS=1.
@@ -28,6 +30,7 @@ final class AppModel {
       self?.tick()
     }
     _ = stage
+    _ = hud
     let server = FeedServer(port: Self.feedPort) { [weak self] message in
       DispatchQueue.main.async { self?.handle(message) }
     }
@@ -54,16 +57,38 @@ final class AppModel {
         limits.ingestRateLimitFailure(resetsAt: nil)
       }
       stage.apply(store.apply(event))
+      hud.refresh()
     case .status(let data):
       guard let payload = try? StatusPayload.decode(data) else { return }
       limits.ingest(payload)
       stage.apply(store.applyStatus(payload))
+      hud.refresh()
     }
   }
 
   private func tick() {
     limits.tick()
     stage.apply(store.tick())
+    hud.refresh()
+  }
+
+  /// Debug helper: feeds limit readings (percent used; reset in seconds) as a status payload.
+  func simulateLimits(
+    five: Double?, fiveResetIn: TimeInterval = 2 * 3600 + 41 * 60, seven: Double?,
+    sevenResetIn: TimeInterval = 3 * 86400
+  ) {
+    let now = Date()
+    let payload = StatusPayload(
+      sessionID: "debug-limits", cwd: nil, modelDisplayName: nil, contextUsedPercentage: nil,
+      totalCostUSD: nil,
+      fiveHour: five.flatMap {
+        LimitWindow(usedPercentage: $0, resetsAt: now.addingTimeInterval(fiveResetIn))
+      },
+      sevenDay: seven.flatMap {
+        LimitWindow(usedPercentage: $0, resetsAt: now.addingTimeInterval(sevenResetIn))
+      })
+    limits.ingest(payload)
+    hud.refresh()
   }
 
   /// Debug helper: feeds a hook event as if it came from Claude Code.
