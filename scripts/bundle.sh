@@ -18,6 +18,10 @@ mkdir -p "$APP/Contents/Resources"
 cp -R art/export "$APP/Contents/Resources/art"
 rm -f "$APP/Contents/Resources/art/sheet.png"
 
+# App icon (committed; rebuild with scripts/icon.sh).
+[ -f art/icon/AppIcon.icns ] || { echo "art/icon/AppIcon.icns missing (run scripts/icon.sh)" >&2; exit 1; }
+cp art/icon/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -26,6 +30,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>app.claudette.Claudette</string>
   <key>CFBundleName</key><string>Claudette</string>
   <key>CFBundleExecutable</key><string>Claudette</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundleVersion</key><string>1</string>

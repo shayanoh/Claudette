@@ -6,6 +6,8 @@ public struct ClaudetteSettings: Codable, Equatable, Sendable {
   public var hoverFadeOpacity = 0.25
   public var dodgeEnabled = true
   public var shyness = 0.5
+  /// She also steps away from the text cursor of the focused app (needs Accessibility permission).
+  public var dodgeTextCursor = false
   public var privacyMode = false
   public var focusMode = false
   public var reduceMotion = false
@@ -38,6 +40,7 @@ public struct ClaudetteSettings: Codable, Equatable, Sendable {
     hoverFadeOpacity = value(.hoverFadeOpacity, d.hoverFadeOpacity)
     dodgeEnabled = value(.dodgeEnabled, d.dodgeEnabled)
     shyness = value(.shyness, d.shyness)
+    dodgeTextCursor = value(.dodgeTextCursor, d.dodgeTextCursor)
     privacyMode = value(.privacyMode, d.privacyMode)
     focusMode = value(.focusMode, d.focusMode)
     reduceMotion = value(.reduceMotion, d.reduceMotion)

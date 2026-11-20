@@ -213,6 +213,13 @@ struct SettingsView: View {
           Text("Dodge the pointer")
           Text("She steps out of the way when the pointer comes close.")
         }
+        Toggle(isOn: binding(\.dodgeTextCursor)) {
+          Text("Dodge the text cursor")
+          Text(
+            "She also steps away from where you type, in terminals too. Needs Accessibility permission."
+          )
+        }
+        .disabled(!s.dodgeEnabled)
         SliderRow(
           title: "Shyness",
           caption: "How early she moves away. Hold Option to keep her still and drag her.",

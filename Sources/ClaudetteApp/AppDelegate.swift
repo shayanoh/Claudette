@@ -61,6 +61,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     menu.addItem(.separator())
     let cleanup = NSMenuItem(title: "Clean up", action: #selector(cleanUp), keyEquivalent: "")
     menu.addItem(cleanup)
+    let stale = NSMenuItem(
+      title: "Finish stale sessions", action: #selector(finishStale), keyEquivalent: "")
+    stale.target = self
+    menu.addItem(stale)
     let focus = NSMenuItem(title: "Focus mode", action: #selector(toggleFocus), keyEquivalent: "")
     focus.target = self
     focus.state = model.settings.settings.focusMode ? .on : .off
@@ -202,6 +206,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.openSettings() }
     }
   }
+
+  @objc private func finishStale() { model.finishStaleSessions() }
 
   @objc private func cleanUp() { model.stage.world.cleanUpAll() }
 

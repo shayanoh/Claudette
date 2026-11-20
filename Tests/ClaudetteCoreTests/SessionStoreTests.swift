@@ -413,3 +413,32 @@ private func result(_ changes: [SessionChange]) -> ToolResult? {
     ev("PostToolUse", tool: "Bash", id: "b3", extra: #""tool_response":{"interrupted":true}"#))
   #expect(result(viaResponse)?.interrupted == true)
 }
+
+@Test func stopFailureEndsEverySubagent() {
+  let (s, _) = make()
+  _ = s.apply(ev("SubagentStart", extra: #""agent_id":"a1""#))
+  _ = s.apply(ev("SubagentStart", extra: #""agent_id":"a2""#))
+  let changes = s.apply(ev("StopFailure", extra: #""error":"rate_limit""#))
+  #expect(changes.contains(.subagentStopped("s1", agentID: "a1")))
+  #expect(changes.contains(.subagentStopped("s1", agentID: "a2")))
+  #expect(s.sessions["s1"]?.subagents.isEmpty == true)
+}
+
+@Test func finishStaleEndsOnlySilentSessionsAndTheirSubagents() {
+  let (s, clock) = make()
+  _ = s.apply(ev("SubagentStart", session: "old", extra: #""agent_id":"a1""#))
+  clock.advance(90)
+  _ = s.apply(ev("UserPromptSubmit", session: "fresh"))
+  let changes = s.finishStale(silentFor: 60)
+  #expect(changes == [.subagentStopped("old", agentID: "a1"), .ended("old")])
+  #expect(s.sessions["old"] == nil)
+  #expect(s.sessions["fresh"] != nil)
+}
+
+@Test func staleSessionComesBackOnItsNextEvent() {
+  let (s, clock) = make()
+  _ = s.apply(ev("UserPromptSubmit"))
+  clock.advance(90)
+  _ = s.finishStale(silentFor: 60)
+  #expect(s.apply(ev("PreToolUse", tool: "Read", id: "t1")).contains(.started("s1")))
+}

@@ -96,6 +96,11 @@ extension World {
     }
     for a in crew {
       putDownHeld(a)
+      if a.puppet.isAsleep || a.puppet.sleepDepth != .awake {  // she wakes up for the job
+        a.sleptBeforeCleanup = true
+        a.puppet.idle()
+        a.puppet.childNode(withName: "sign")?.removeFromParent()
+      }
       a.puppet.removeAction(forKey: "brain")
       a.puppet.setWalking(false)
       a.task = nil
@@ -351,9 +356,19 @@ extension World {
     a.cleaning = nil
     a.armful.removeAll()
     updateArms(a)
+    resleep(a)
     run.remaining -= 1
     if run.remaining <= 0 { finish(run) }
     DispatchQueue.main.async { [weak self, weak a] in if let self, let a { self.brainEnded(a) } }
+  }
+
+  /// Back to bed after a cleanup that woke her: the limit scene returns through the HUD, an idle
+  /// nap here (only if nothing woke her session in the meantime).
+  private func resleep(_ a: Actor) {
+    guard a.sleptBeforeCleanup else { return }
+    a.sleptBeforeCleanup = false
+    if a.lastPhase == .sleeping { a.puppet.sleep() }
+    stage.onResleep?()
   }
 
   private func finish(_ run: CleanupRun) {
@@ -378,6 +393,7 @@ extension World {
     a.armful.removeAll()
     updateArms(a)
     a.cleaning = nil
+    resleep(a)
     run.remaining -= 1
     if run.remaining <= 0 { finish(run) }
   }

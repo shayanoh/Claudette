@@ -348,6 +348,7 @@ final class LimitsHUD {
       self.refresh()
     }
     limits.onLifted = { [weak self] _ in self?.celebrate() }
+    stage.onResleep = { [weak self] in self?.refresh() }
   }
 
   private var anyLimit: Bool {
@@ -359,6 +360,7 @@ final class LimitsHUD {
     let five = limits.state(.fiveHour)
     let seven = limits.state(.sevenDay)
     let depth = SleepDepth.from(five: five.status, seven: seven.status)
+    if depth != .awake { stage.dismissAllSubs() }
     for actor in stage.actors.values {
       let jar =
         (actor.puppet.childNode(withName: "jar") as? JarNode)
@@ -369,6 +371,7 @@ final class LimitsHUD {
           return j
         }()
       jar.update(five, now: now, privacy: settings.settings.privacyMode)
+      if actor.cleaning != nil { continue }  // awake for a cleanup; she sleeps again afterwards
       actor.puppet.setSleepDepth(depth)
       actor.puppet.childNode(withName: "sign")?.removeFromParent()
       switch depth {

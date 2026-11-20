@@ -200,6 +200,7 @@ public final class SessionStore {
       entries[id]!.turnActive = false
       entries[id]!.attention = .error(Self.errorKind(e.errorType))
       changes += finishAllTools(id: id, success: false)
+      changes += dropSubagents(id: id)  // a failed turn (limit, API error) leaves no agent running
     case "SubagentStart":
       if let a = e.agentID, entries[id]!.state.subagents.insert(a).inserted {
         changes.append(.subagentStarted(id, agentID: a))
@@ -238,6 +239,24 @@ public final class SessionStore {
     if let m = p.modelDisplayName, m != entries[id]!.state.model {
       entries[id]!.state.model = m
       changes.append(.modelChanged(id, m))
+    }
+    return changes
+  }
+
+  // MARK: - Stale sessions
+
+  /// The user's "Finish stale sessions": every session silent for `window` is treated as ended
+  /// (its sub-agents too). Unlike a real SessionEnd it opens no late-event window, so a session
+  /// that is in fact alive simply comes back with its next event.
+  public func finishStale(silentFor window: TimeInterval = 60) -> [SessionChange] {
+    let t = now()
+    var changes: [SessionChange] = []
+    for id in entries.keys.sorted() {
+      guard let entry = entries[id], t.timeIntervalSince(entry.state.lastEventAt) >= window
+      else { continue }
+      changes += dropSubagents(id: id)
+      entries[id] = nil
+      changes.append(.ended(id))
     }
     return changes
   }
@@ -316,6 +335,12 @@ public final class SessionStore {
     entries[id]!.state.activeTools = []
     entries[id]!.announcedLong = []
     return left.map { .toolFinished(id, toolUseID: $0.toolUseID, success: success) }
+  }
+
+  private func dropSubagents(id: String) -> [SessionChange] {
+    let gone = entries[id]!.state.subagents.sorted()
+    entries[id]!.state.subagents = []
+    return gone.map { .subagentStopped(id, agentID: $0) }
   }
 
   private func refresh(_ id: String, _ changes: inout [SessionChange]) {

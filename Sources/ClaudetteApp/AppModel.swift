@@ -12,6 +12,8 @@ final class AppModel {
   let overlay = OverlayController()
   private(set) lazy var stage = Stage(overlay: overlay, settings: settings)
   private let pointer = PointerTracker()
+  private let caret = CaretTracker()
+  private var caretAsked = false
   private(set) lazy var hud = LimitsHUD(
     limits: limits, stage: stage, overlay: overlay, settings: settings)
   private var server: FeedServer?
@@ -25,7 +27,12 @@ final class AppModel {
   func start() -> String {
     pointer.onMove = { [stage] p, flags in stage.pointerMoved(p, modifiers: flags) }
     pointer.start()
-    settings.onChange = { [stage] _ in stage.settingsChanged() }
+    caret.onCaret = { [stage] p in stage.caretMoved(p) }
+    settings.onChange = { [weak self, stage] s in
+      stage.settingsChanged()
+      self?.updateCaretTracking()
+    }
+    updateCaretTracking()
     timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
       self?.tick()
     }
@@ -44,7 +51,21 @@ final class AppModel {
     }
   }
 
+  private func updateCaretTracking() {
+    let s = settings.settings
+    if s.dodgeEnabled && s.dodgeTextCursor {
+      if !caretAsked && !AXIsProcessTrusted() {
+        caretAsked = true
+        CaretTracker.requestAccess()
+      }
+      caret.start()
+    } else {
+      caret.stop()
+    }
+  }
+
   func stop() {
+    caret.stop()
     server?.stop()
     pointer.stop()
     timer?.invalidate()
@@ -67,6 +88,12 @@ final class AppModel {
       stage.apply(store.applyStatus(payload), sessions: store.sessions)
       hud.refresh()
     }
+  }
+
+  /// The menubar "Finish stale sessions": sessions silent for a minute are treated as ended.
+  func finishStaleSessions() {
+    stage.apply(store.finishStale(), sessions: store.sessions)
+    hud.refresh()
   }
 
   private func tick() {

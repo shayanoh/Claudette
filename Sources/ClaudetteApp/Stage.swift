@@ -25,6 +25,8 @@ final class Actor {
   var nextRoam = Date.distantPast
   /// Set while she is collecting items for the trash can.
   var cleaning: CleanupRun?
+  /// She was asleep (limit scene or idle nap) when a cleanup woke her; she sleeps again after it.
+  var sleptBeforeCleanup = false
   /// Her session ended and she is tidying up before she goes; a resume of the same session id keeps her.
   var leaving = false
   /// The project folder name without privacy applied (the displayed `projectName` may be dots).
@@ -285,9 +287,11 @@ final class Stage {
       a.puppet.idle()
     }
     if case .error = a.lastPhase, !isError(phase) { a.puppet.relief() }
-    if a.lastPhase == .working, phase == .idle { a.puppet.perform(.celebrate) }  // turn finished
+    let turnFinished = a.lastPhase == .working && phase == .idle
+    if turnFinished { a.puppet.perform(.celebrate) }
     a.lastPhase = phase
     a.puppet.setStatus(phase)
+    if turnFinished { a.puppet.showWaiting() }  // done: your move
     world.phaseChanged(session: id, phase: phase)
   }
 
@@ -370,6 +374,14 @@ final class Stage {
     sub.puppet.wake()
     noteActivity()
   }
+
+  /// A usage limit sends every sub-agent home: they cannot work, so none stays up and moving.
+  func dismissAllSubs() {
+    for (id, parent) in actors { for agent in Array(parent.subs.keys) { removeSub(id, agent) } }
+  }
+
+  /// Set by the limits HUD: re-applies the limit sleep scene to whoever should be in it.
+  var onResleep: (() -> Void)?
 
   private func removeSub(_ id: String, _ agent: String) {
     guard let sub = actors[id]?.subs.removeValue(forKey: agent) else { return }
@@ -565,21 +577,7 @@ final class Stage {
     for a in allActors where a.visible {
       let r = rect(a)
       let inside = r.contains(p)
-      var cornered = false
-      if s.dodgeEnabled && a.cleaning == nil && !reduceMotion && !modifiers.contains(.option)
-        && !a.isDodging
-        && Date().timeIntervalSince(a.lastDodge) > 0.35
-      {
-        let others = allActors.filter { $0 !== a && $0.visible }.map(rect)
-        if let next = DodgePlanner.nextPosition(
-          sprite: r, pointer: p, screens: screenFrames, shyness: s.shyness,
-          otherSprites: others)
-        {
-          if next != r.origin { dodge(a, to: next) }
-        } else {
-          cornered = true
-        }
-      }
+      let cornered = !modifiers.contains(.option) && dodgeFrom(p, a)
       setFade(
         a,
         on: inside && s.hoverFadeEnabled
@@ -587,6 +585,29 @@ final class Stage {
       setNameTag(a, inside && s.showProjectName && !a.projectName.isEmpty ? a.projectName : nil)
       trackPetting(a, inside: inside, at: p)
     }
+  }
+
+  /// Steps `a` away from `p` when it is too close. True when she is cornered (nowhere to go).
+  @discardableResult
+  private func dodgeFrom(_ p: CGPoint, _ a: Actor) -> Bool {
+    let s = settings.settings
+    guard s.dodgeEnabled, a.cleaning == nil, !reduceMotion, !a.isDodging, a.visible,
+      Date().timeIntervalSince(a.lastDodge) > 0.35
+    else { return false }
+    let others = allActors.filter { $0 !== a && $0.visible }.map(rect)
+    guard
+      let next = DodgePlanner.nextPosition(
+        sprite: rect(a), pointer: p, screens: screenFrames, shyness: s.shyness,
+        otherSprites: others)
+    else { return true }
+    if next != rect(a).origin { dodge(a, to: next) }
+    return false
+  }
+
+  /// The focused app's text cursor moved (nil: none): she keeps out of its way like the pointer's.
+  func caretMoved(_ p: CGPoint?) {
+    guard let p, settings.settings.dodgeTextCursor, dragging == nil else { return }
+    for a in allActors { dodgeFrom(p, a) }
   }
 
   private func updateMouseTransparency(_ p: CGPoint) {

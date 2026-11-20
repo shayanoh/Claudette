@@ -27,6 +27,12 @@ extension PuppetNode {
     }
   }
 
+  /// The turn is over and she is waiting for you: a calm green pill until something else happens.
+  /// (A shape badge for now; the next `setStatus` replaces it.)
+  func showWaiting() {
+    badge(text: "your turn", color: Palette.success, wave: false, pill: true)
+  }
+
   static func errorText(_ kind: ErrorKind) -> String {
     switch kind {
     case .api: return "API error"
