@@ -68,6 +68,40 @@
       ],
       "z": -1
     },
+    "blanket": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "blanket.png",
+      "parent": "bodyPivot",
+      "position": [
+        0,
+        -2
+      ],
+      "size": [
+        162,
+        40
+      ],
+      "z": 3
+    },
+    "blanket_deep": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "blanket_deep.png",
+      "parent": "bodyPivot",
+      "position": [
+        0,
+        -2
+      ],
+      "size": [
+        166,
+        46
+      ],
+      "z": 3
+    },
     "blush_L": {
       "anchor": [
         0.5,
@@ -459,6 +493,17 @@
       ],
       "z": 1
     },
+    "moon_new": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "moon_new.png",
+      "size": [
+        58,
+        58
+      ]
+    },
     "mouth": {
       "anchor": [
         0.5,
@@ -511,6 +556,23 @@
         15
       ],
       "variantOf": "mouth"
+    },
+    "night_patch": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "night_patch.png",
+      "parent": "root",
+      "position": [
+        0,
+        -24
+      ],
+      "size": [
+        300,
+        250
+      ],
+      "z": -50
     },
     "prop_edit": {
       "anchor": [
@@ -808,6 +870,36 @@
       ],
       "z": -10
     },
+    "sign_deep": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "sign_deep.png",
+      "label": [
+        11.0,
+        0
+      ],
+      "size": [
+        152,
+        36
+      ]
+    },
+    "sign_nap": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "sign_nap.png",
+      "label": [
+        11.0,
+        0
+      ],
+      "size": [
+        192,
+        36
+      ]
+    },
     "spark": {
       "anchor": [
         0.5,
@@ -824,6 +916,17 @@
         30
       ],
       "z": 5
+    },
+    "star_twinkle": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "star_twinkle.png",
+      "size": [
+        12,
+        12
+      ]
     },
     "status_bang": {
       "anchor": [

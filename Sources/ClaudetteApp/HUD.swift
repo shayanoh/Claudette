@@ -40,6 +40,8 @@ final class JarNode: SKNode {
     rect: CGRect(x: -30, y: -14, width: 60, height: 26), cornerRadius: 8)
   private let line1 = SKLabelNode()
   private let line2 = SKLabelNode()
+  /// Art mode: the fill sprite (anchored at its bottom edge), scaled in Y to the remaining budget.
+  private var artFill: SKSpriteNode?
 
   override init() {
     super.init()
@@ -69,7 +71,17 @@ final class JarNode: SKNode {
     }
     line1.position = CGPoint(x: 0, y: 1)
     line2.position = CGPoint(x: 0, y: -10)
-    [liquid, glass, lid, tag].forEach(addChild)
+    if let lib = ArtLibrary.shared, let jar = lib.sprite("jar_glass") {
+      // Fill and lid are children of the glass in the manifest (fill behind the glass details).
+      for child in ["jar_fill", "jar_lid"] {
+        guard let sprite = lib.sprite(child) else { continue }
+        jar.addChild(sprite)
+        if child == "jar_fill" { artFill = sprite }
+      }
+      [jar, tag].forEach(addChild)
+    } else {
+      [liquid, glass, lid, tag].forEach(addChild)
+    }
   }
 
   required init?(coder: NSCoder) { fatalError("not supported") }
@@ -80,6 +92,7 @@ final class JarNode: SKNode {
     liquid.path = CGPath(
       roundedRect: CGRect(x: -9, y: 2, width: 18, height: max(0.1, h)), cornerWidth: 3,
       cornerHeight: 3, transform: nil)
+    artFill?.yScale = max(0.02, remaining)
     alpha = s.status == .unknown ? 0.4 : 1
     line1.text = "5h \(LimitText.percent(s))"
     switch (s.status, s.resetsAt) {
@@ -102,6 +115,9 @@ final class MoonNode: SKNode {
   private let dark = SKShapeNode(circleOfRadius: 20)
   private let lit = SKShapeNode()
   private let label = SKLabelNode()
+  /// Art mode: the bright moon sprite shown through a phase-shaped mask.
+  private let phaseMask = SKShapeNode()
+  private var usesArt = false
 
   override init() {
     super.init()
@@ -116,8 +132,23 @@ final class MoonNode: SKNode {
     label.fontSize = 10
     label.fontColor = .white
     label.position = CGPoint(x: 0, y: -38)
-    addChild(dark)
-    addChild(lit)
+    if let lib = ArtLibrary.shared, let darkSprite = lib.sprite("moon_dark"),
+      let litSprite = lib.sprite("moon_lit")
+    {
+      usesArt = true
+      phaseMask.fillColor = .white
+      phaseMask.strokeColor = .clear
+      let crop = SKCropNode()
+      crop.maskNode = phaseMask
+      crop.zPosition = 1
+      litSprite.zPosition = 0
+      crop.addChild(litSprite)
+      addChild(darkSprite)
+      addChild(crop)
+    } else {
+      addChild(dark)
+      addChild(lit)
+    }
     addChild(label)
   }
 
@@ -141,6 +172,7 @@ final class MoonNode: SKNode {
     isHidden = s.status == .unknown
     let k = CGFloat(s.usedPercentage.map { max(0, min(1, 1 - $0 / 100)) } ?? 1)
     lit.path = Self.litPath(fraction: k, radius: 18)
+    if usesArt { phaseMask.path = Self.litPath(fraction: k, radius: 19) }
     label.text =
       "wk \(LimitText.percent(s))" + (s.resetsAt.map { " · \(LimitText.weekday($0))" } ?? "")
   }
@@ -188,7 +220,6 @@ final class LimitsHUD {
   private let overlay: OverlayController
   private let settings: SettingsStore
   private let moon = MoonNode()
-  private var dimmed = false
 
   /// Called with the new menubar image whenever the limit state may have changed.
   var onGlyph: ((NSImage) -> Void)?
@@ -200,7 +231,7 @@ final class LimitsHUD {
     self.settings = settings
     limits.onTransition = { [weak self] _, _, _ in
       guard let self else { return }
-      self.setNight(self.anyLimit)
+      self.stage.noteActivity()
       self.refresh()
     }
     limits.onLifted = { [weak self] _ in self?.celebrate() }
@@ -214,6 +245,7 @@ final class LimitsHUD {
     let now = Date()
     let five = limits.state(.fiveHour)
     let seven = limits.state(.sevenDay)
+    let depth = SleepDepth.from(five: five.status, seven: seven.status)
     for actor in stage.actors.values {
       let jar =
         (actor.puppet.childNode(withName: "jar") as? JarNode)
@@ -224,10 +256,12 @@ final class LimitsHUD {
           return j
         }()
       jar.update(five, now: now, privacy: settings.settings.privacyMode)
-      if five.status == .inLimit {
-        showSign(on: actor.puppet, until: five.resetsAt)
-      } else {
-        actor.puppet.childNode(withName: "sign")?.removeFromParent()
+      actor.puppet.setSleepDepth(depth)
+      actor.puppet.childNode(withName: "sign")?.removeFromParent()
+      switch depth {
+      case .nap: showSign(on: actor.puppet, until: five.resetsAt, deep: false)
+      case .deep: showSign(on: actor.puppet, until: seven.resetsAt, deep: true)
+      case .awake: break
       }
     }
     if let id = overlay.mainDisplayID, let scene = overlay.overlays[id]?.scene {
@@ -250,47 +284,36 @@ final class LimitsHUD {
     }
   }
 
-  private func showSign(on puppet: SKNode, until: Date?) {
-    guard puppet.childNode(withName: "sign") == nil else { return }
-    let text = until.map { "gone napping · back at \(LimitText.clock($0))" } ?? "gone napping"
+  /// The "gone napping" (5-hour) or "back <weekday time>" (weekly) sign above a sleeping Claudette.
+  private func showSign(on puppet: SKNode, until: Date?, deep: Bool) {
+    let text =
+      deep
+      ? (until.map { "back \(LimitText.weekday($0))" } ?? "deep sleep")
+      : (until.map { "gone napping · back at \(LimitText.clock($0))" } ?? "gone napping")
     let label = SKLabelNode(text: text)
     label.fontName = "AvenirNext-DemiBold"
     label.fontSize = 11
     label.fontColor = Palette.ink
     label.verticalAlignmentMode = .center
-    let w = label.frame.width + 16
-    let sign = SKShapeNode(rect: CGRect(x: -w / 2, y: -12, width: w, height: 24), cornerRadius: 8)
+    let sign: SKNode
+    let artName = deep ? "sign_deep" : "sign_nap"
+    if let lib = ArtLibrary.shared, let sprite = lib.sprite(artName) {
+      sign = sprite
+      label.position = lib.asset(artName)?.label.map { CGPoint(x: $0[0], y: $0[1]) } ?? .zero
+      label.zPosition = 1
+    } else {
+      let w = label.frame.width + 16
+      let box = SKShapeNode(rect: CGRect(x: -w / 2, y: -12, width: w, height: 24), cornerRadius: 8)
+      box.fillColor = Palette.hex(0xFFF8F0)
+      box.strokeColor = Palette.ink
+      box.lineWidth = 1.5
+      sign = box
+    }
     sign.name = "sign"
-    sign.fillColor = Palette.hex(0xFFF8F0)
-    sign.strokeColor = Palette.ink
-    sign.lineWidth = 1.5
     sign.position = CGPoint(x: -30, y: PuppetNode.hitBounds.maxY + 88)
     sign.zPosition = 10
     sign.addChild(label)
     puppet.addChild(sign)
-  }
-
-  /// A dark night patch behind each napping Claudette (not the whole desktop).
-  private func showNight(on puppet: SKNode) {
-    guard puppet.childNode(withName: "night") == nil else { return }
-    let patch = SKShapeNode(
-      rect: CGRect(x: -150, y: -24, width: 300, height: 250), cornerRadius: 60)
-    patch.name = "night"
-    patch.fillColor = Palette.hex(0x1D2440).withAlphaComponent(0.55)
-    patch.strokeColor = .clear
-    patch.zPosition = -50
-    patch.alpha = 0
-    puppet.addChild(patch)
-    patch.run(.fadeIn(withDuration: 1.0))
-  }
-
-  private func setNight(_ on: Bool) {
-    guard on != dimmed else { return }
-    dimmed = on
-    stage.noteActivity()
-    for a in stage.actors.values {
-      if on { a.puppet.sleep() } else { a.puppet.idle() }
-    }
   }
 
   private func celebrate() {

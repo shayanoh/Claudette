@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(HERE, "src"))
 import parts as P  # noqa: E402
 import props as R  # noqa: E402
 import status as St  # noqa: E402
+import sleep as Sl  # noqa: E402
 
 BUILD = os.path.join(HERE, "build")
 EXPORT = os.path.join(HERE, "export")
@@ -45,9 +46,13 @@ PARTS = {
     "jar_lid": (P.jar_lid, "jar_glass", (0, 33), 2),  # 1 pt overlap seats it on the rim
     "moon_dark": (P.moon_dark, None, None, 0),
     "moon_lit": (P.moon_lit, None, None, 1),
+    # Sleep scenes. Blankets sit above the body (1) and below the face (4).
+    "blanket": (Sl.blanket, "bodyPivot", (0, -2), 3),
+    "blanket_deep": (Sl.blanket_deep, "bodyPivot", (0, -2), 3),
+    "night_patch": (Sl.night_patch, "root", (0, -24), -50),
 }
 # Props whose anchor is [0.5, 0]: canvas bottom is the pivot, no margin below.
-FLUSH_BOTTOM = {"bag", "bag_fill", "jar_glass", "jar_fill", "jar_lid"}
+FLUSH_BOTTOM = {"bag", "bag_fill", "jar_glass", "jar_fill", "jar_lid", "blanket", "blanket_deep", "night_patch"}
 
 # Texture variants "<base>.<variant>": same canvas and anchor as the base (the union of all).
 VARIANTS = {
@@ -110,7 +115,13 @@ STATUS = {
        for n in ("api", "auth", "billing", "ratelimit", "offline", "unknown")},
     "status_relief": (St.status_relief, "centre", St.RELIEF_LABEL, False),
 }
-TOP = {**PROPS, **STATUS}
+SLEEP = {
+    "sign_nap": (Sl.sign_nap, "centre", [Sl.sign_layout(Sl.NAP_W)[2], 0], False),
+    "sign_deep": (Sl.sign_deep, "centre", [Sl.sign_layout(Sl.DEEP_W)[2], 0], False),
+    "moon_new": (Sl.moon_new, "centre", False, False),
+    "star_twinkle": (Sl.star_twinkle, "centre", False, False),
+}
+TOP = {**PROPS, **STATUS, **SLEEP}
 
 
 def symmetric(box, kind):
@@ -254,7 +265,8 @@ def figure(assets, uris, names, cx, ground, k, swap=None, levels=None):
 
 TINTS = ["#7FC8F8", "#FFC94D", "#E5484D"]  # sample runtime tints for the cartridge check
 LEVEL = {"bag_fill": 0.55, "jar_fill": 0.6}  # sheet preview of the fill levels
-CHARACTER = [n for n in PARTS if n not in ("jar_glass", "jar_fill", "jar_lid", "moon_dark", "moon_lit")]
+CHARACTER = [n for n in PARTS if n not in ("jar_glass", "jar_fill", "jar_lid", "moon_dark", "moon_lit",
+                                             "blanket", "blanket_deep", "night_patch")]
 POSES = [  # (hidden parts, swaps)
     ({"mouth", "bag", "bag_fill"}, {}),
     (set(), {"eye_L": "eye_L.happy", "eye_R": "eye_R.happy"}),
@@ -284,7 +296,8 @@ def sheet(manifest):
     tint_cols, tint_cell = 9, (W - 2 * pad) // 9
     tint_rows = math.ceil(len(tints) * len(TINTS) / tint_cols)
     props_h = (prop_rows + 1) * 2 * prop_cell + tint_rows * tint_cell
-    H = pad + fig_h + pad + pose_h + pad + props_h + pad + rows * (ch + 40) + pad
+    scene_h = 340
+    H = pad + fig_h + pad + pose_h + pad + 2 * scene_h + pad + props_h + pad + rows * (ch + 40) + pad
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">',
          '<defs>'
          '<pattern id="lc" width="16" height="16" patternUnits="userSpaceOnUse">'
@@ -314,6 +327,36 @@ def sheet(manifest):
         o.append(figure(assets, uris, [n for n in CHARACTER if n not in hide],
                         pad + step * (i + 0.5), y + pose_h - 25, 0.9, swap))
     y += pose_h + pad
+    # Sleep scenes at 1.1x: weekly deep sleep (left) and 5-hour nap (right), on light then dark.
+    def at(name, wx, wy, cx, ground, k):
+        a = assets[name]
+        w, h = a["size"]
+        return image(a, uris[name], cx + wx * k - a["anchor"][0] * w * k,
+                     ground - wy * k - (1 - a["anchor"][1]) * h * k, k)
+    sleepy = {"eye_L": "eye_L.sleep", "eye_R": "eye_R.sleep"}
+    awake_off = {"mouth", "spark", "bag", "bag_fill"}
+    deep = ([n for n in CHARACTER if n not in awake_off] + ["blanket_deep", "night_patch"],
+            {**sleepy, "body": "body.sleep_curl", **{f"leg_{i}": f"leg_{i}.tuck" for i in range(4)}})
+    nap = ([n for n in CHARACTER if n not in awake_off] + ["blanket"], sleepy)
+    sk = 1.1
+    for j, bg in enumerate(("#EEF0F7", "#2A2F45")):
+        ry = y + j * scene_h
+        o.append(f'<rect x="{pad}" y="{ry}" width="{W-2*pad}" height="{scene_h}" fill="{bg}"/>')
+        ground = ry + scene_h - 75
+        cx = pad + half / 2
+        o.append(figure(assets, uris, deep[0], cx, ground, sk, deep[1]))
+        o.append(at("moon_new", 95, 185, cx, ground, sk))
+        for wx, wy in ((-115, 150), (122, 110), (-60, 205)):
+            o.append(at("star_twinkle", wx, wy, cx, ground, sk))
+        o.append(at("sign_deep", 0, -45, cx, ground, sk))
+        cx = pad + half * 1.5
+        o.append(figure(assets, uris, nap[0], cx, ground, sk, nap[1]))
+        o.append(at("sign_nap", 0, -45, cx, ground, sk))
+        for name, wx in (("sign_deep", -half / 2), ("sign_nap", half / 2)):
+            a = assets[name]
+            lx, ly = pad + half * (1 if wx > 0 else 0) + half / 2 + a["label"][0] * sk, ground + 45 * sk - a["label"][1] * sk
+            o.append(f'<rect x="{lx-40}" y="{ly-4}" width="80" height="8" rx="4" fill="#8A8FA3"/>')
+    y += 2 * scene_h + pad
     # Props at 2x, each row on light then dark, with the label slot shown as a grey bar.
     def put(name, cx, cy, k, extra=""):
         a = assets[name]

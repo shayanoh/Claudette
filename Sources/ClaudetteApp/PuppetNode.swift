@@ -1,4 +1,5 @@
 import AppKit
+import ClaudetteCore
 import SpriteKit
 
 enum Palette {
@@ -38,6 +39,8 @@ final class PuppetNode: SKNode {
   var eyes: [SKNode] = []
   /// Art only: the smile sprite, hidden at rest.
   var mouth: SKNode?
+  /// Usage-limit sleep scene currently shown (see `setSleepDepth`).
+  var sleepDepth: SleepDepth = .awake
   private var asleep = false
 
   override init() {

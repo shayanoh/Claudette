@@ -107,6 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     for (title, tag) in [
       ("Fresh (5h 12%, week 18%)", 0), ("Low (5h 88%, week 71%)", 1), ("In limit (5h 100%)", 2),
       ("Lifted (5h 3%)", 3), ("Unknown (no data)", 4),
+      ("Weekly limit (week 100%)", 5),
     ] {
       let i = NSMenuItem(title: title, action: #selector(simulate(_:)), keyEquivalent: "")
       i.target = self
@@ -133,7 +134,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     if let seq = env["CLAUDETTE_DEBUG_LIMITS"] {
       // e.g. "fresh,low,limit,lifted": one step every 4 seconds starting after 2 seconds
       for (i, step) in seq.split(separator: ",").enumerated() {
-        let tag = ["fresh": 0, "low": 1, "limit": 2, "lifted": 3, "unknown": 4][String(step)] ?? 4
+        let tag =
+          ["fresh": 0, "low": 1, "limit": 2, "lifted": 3, "unknown": 4, "weeklimit": 5][
+            String(step)] ?? 4
         DispatchQueue.main.asyncAfter(deadline: .now() + 2 + Double(i) * 4) { [weak self] in
           let item = NSMenuItem()
           item.tag = tag
@@ -177,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     case 1: model.simulateLimits(five: 88, fiveResetIn: 47 * 60, seven: 71)
     case 2: model.simulateLimits(five: 100, fiveResetIn: 3600, seven: 71)
     case 3: model.simulateLimits(five: 3, seven: 71)
+    case 5: model.simulateLimits(five: 20, seven: 100, sevenResetIn: 2 * 86400 + 3600)
     default: break
     }
   }
