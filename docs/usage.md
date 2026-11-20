@@ -4,8 +4,10 @@
 
 Open the menubar item, choose **Settings…**, and under **Claude Code**:
 
-1. **Plugin → Install…** creates `~/.claude/skills/claudette` (hook settings that send activity to
-   Claudette on this Mac only). Start a new Claude Code session afterwards.
+1. **Activity plugin → Install…** creates `~/.claude/skills/claudette` (a small script that sends
+   activity to Claudette on this Mac only, and always exits quietly, so Claude Code reports no hook
+   errors when Claudette is closed). Start a new Claude Code session afterwards. An older install
+   shows **Update…**: press it to switch to the silent script.
 2. **Usage limits → Connect…** wraps your `statusLine` command in `~/.claude/settings.json` so the
    5-hour and weekly limits reach Claudette. Your own status line keeps working; a backup is kept;
    **Disconnect** restores it. Limits only appear for Claude.ai Pro/Max subscribers, and only after
@@ -22,8 +24,8 @@ Both steps ask for confirmation first and show exactly which file they change.
 - `!` (amber, she waves) means a permission prompt is waiting; `?` (blue) means Claude asked a
   question; a red pill names an API, sign-in, billing or rate-limit error.
 - The jar on her shoulder is the 5-hour window (fill = what is left); the moon in the top-right is the
-  weekly window. At the limit the screen dims, she naps with a "back at HH:MM" sign, and when the
-  limit lifts there is confetti. The menubar glyph mirrors both.
+  weekly window (it fades under the pointer; drag it wherever you like, it remembers). At the limit the screen dims, she naps with a "back at HH:MM" sign, and when the
+  limit lifts there is confetti. The menubar icon is Claudette herself with a status dot; the limit levels are the first line of its menu.
 - Context window = the little backpack on her left shoulder.
 
 ## Playing with her

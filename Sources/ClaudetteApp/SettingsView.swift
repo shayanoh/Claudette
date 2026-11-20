@@ -178,78 +178,230 @@ struct SettingsView: View {
       set: { value in model.set { $0[keyPath: keyPath] = value } })
   }
 
+  private static func percent(_ v: Double) -> String { "\(Int((v * 100).rounded()))%" }
+
   var body: some View {
+    let s = model.settings
     Form {
-      Section("Size") {
-        HStack {
-          Slider(value: binding(\.scale), in: 0.5...2.0, step: 0.05)
-          Text("\(Int(model.settings.scale * 100))%").monospacedDigit().frame(width: 48)
+      Section {
+        SliderRow(
+          title: "Size", caption: "How big Claudette is on screen.",
+          value: binding(\.scale), range: 0.5...2.0,
+          minLabel: "50%", maxLabel: "200%", readout: Self.percent(s.scale))
+        Toggle(isOn: binding(\.reduceMotion)) {
+          Text("Reduce motion")
+          Text("Calmer animation with less bouncing and fewer effects.")
         }
+      } header: {
+        SectionHeader(title: "Appearance", symbol: "paintbrush")
       }
-      Section("Pointer") {
-        Toggle("Fade when the pointer is over her", isOn: binding(\.hoverFadeEnabled))
-        if model.settings.hoverFadeEnabled {
-          HStack {
-            Text("Opacity")
-            Slider(value: binding(\.hoverFadeOpacity), in: 0.2...0.3)
-            Text("\(Int(model.settings.hoverFadeOpacity * 100))%").monospacedDigit().frame(
-              width: 48)
-          }
+
+      Section {
+        Toggle(isOn: binding(\.hoverFadeEnabled)) {
+          Text("Fade under the pointer")
+          Text("She turns see-through while the pointer is over her, so she never hides text.")
         }
-        Toggle("Dodge the pointer", isOn: binding(\.dodgeEnabled))
-        if model.settings.dodgeEnabled {
-          HStack {
-            Text("Shyness")
-            Slider(value: binding(\.shyness), in: 0...1)
-          }
-          Text(
-            "Hold Option while moving the pointer to keep her still so you can grab and drag her."
-          )
-          .font(.caption).foregroundStyle(.secondary)
+        SliderRow(
+          title: "Faded opacity", caption: "How visible she stays while faded.",
+          value: binding(\.hoverFadeOpacity), range: 0.2...0.3,
+          minLabel: "20%", maxLabel: "30%", readout: Self.percent(s.hoverFadeOpacity)
+        )
+        .disabled(!s.hoverFadeEnabled)
+        Toggle(isOn: binding(\.dodgeEnabled)) {
+          Text("Dodge the pointer")
+          Text("She steps out of the way when the pointer comes close.")
         }
+        SliderRow(
+          title: "Shyness",
+          caption: "How early she moves away. Hold Option to keep her still and drag her.",
+          value: binding(\.shyness), range: 0...1,
+          minLabel: "Bold", maxLabel: "Shy", readout: Self.percent(s.shyness)
+        )
+        .disabled(!s.dodgeEnabled)
+      } header: {
+        SectionHeader(title: "Pointer", symbol: "cursorarrow.rays")
       }
-      Section("Comfort") {
-        Toggle("Privacy mode (hide file, project and server names)", isOn: binding(\.privacyMode))
-        Toggle("Focus mode (hide Claudette)", isOn: binding(\.focusMode))
-        Toggle("Reduce motion", isOn: binding(\.reduceMotion))
+
+      Section {
+        Toggle(isOn: binding(\.privacyMode)) {
+          Text("Privacy mode")
+          Text("Hide file, project and server names, for screen sharing.")
+        }
+        Toggle(isOn: binding(\.focusMode)) {
+          Text("Focus mode")
+          Text("Hide Claudette completely. The menubar icon still shows status.")
+        }
         Toggle(
-          "Launch at login",
-          isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+          isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) })
+        ) {
+          Text("Launch at login")
+          Text("Start Claudette automatically when you log in.")
+        }
+      } header: {
+        SectionHeader(title: "Privacy and comfort", symbol: "hand.raised")
       }
-      Section("Claude Code") {
-        HStack {
-          Text(model.pluginInstalled ? "Plugin installed" : "Plugin not installed")
-          Spacer()
-          if model.pluginInstalled {
-            Button("Remove") { model.uninstallPlugin() }
-          } else {
-            Button("Install…") { model.installPlugin() }
-          }
-        }
-        HStack {
-          VStack(alignment: .leading) {
-            switch model.statusLine {
-            case .installed: Text("Usage limits connected")
-            case .notInstalled: Text("Usage limits not connected")
-            case .overriddenByProject:
-              Text("A project status line overrides Claudette").foregroundStyle(.orange)
-            }
-          }
-          Spacer()
-          if model.statusLine == .notInstalled {
-            Button("Connect…") { model.installStatusLine() }
-          } else {
-            Button("Disconnect") { model.uninstallStatusLine() }
-          }
-        }
+
+      Section {
+        pluginRow
+        statusLineRow
         if !model.message.isEmpty {
-          Text(model.message).font(.caption).foregroundStyle(.secondary)
+          Label(model.message, systemImage: "info.circle")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
+      } header: {
+        SectionHeader(title: "Claude Code connection", symbol: "link")
+      } footer: {
+        Text(
+          "Both only talk to Claudette on this Mac. Start a new Claude Code session after a change."
+        )
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
     .formStyle(.grouped)
-    .frame(width: 460, height: 740)
+    .frame(minWidth: 460, idealWidth: 500, minHeight: 420, idealHeight: 680)
     .onAppear { model.refresh() }
+  }
+
+  @ViewBuilder private var pluginRow: some View {
+    ConnectionRow(
+      title: "Activity plugin",
+      caption: "Lets Claudette see what Claude Code is doing.",
+      state: model.pluginNeedsUpdate
+        ? .warning("Needs update: reports errors while Claudette is closed")
+        : model.pluginInstalled ? .good("Installed") : .off("Not installed")
+    ) {
+      if model.pluginNeedsUpdate {
+        Button("Remove") { model.uninstallPlugin() }
+        Button("Update…") { model.updatePlugin() }.buttonStyle(.borderedProminent)
+      } else if model.pluginInstalled {
+        Button("Remove") { model.uninstallPlugin() }
+      } else {
+        Button("Install…") { model.installPlugin() }.buttonStyle(.borderedProminent)
+      }
+    }
+  }
+
+  private var statusLineState: ConnectionState {
+    switch model.statusLine {
+    case .installed: return .good("Connected")
+    case .notInstalled: return .off("Not connected")
+    case .overriddenByProject:
+      return .warning("A project status line overrides Claudette, so limits may not arrive")
+    }
+  }
+
+  @ViewBuilder private var statusLineRow: some View {
+    ConnectionRow(
+      title: "Usage limits",
+      caption: "Reads your 5-hour and weekly limits from the Claude Code status line.",
+      state: statusLineState
+    ) {
+      if model.statusLine == .notInstalled {
+        Button("Connect…") { model.installStatusLine() }.buttonStyle(.borderedProminent)
+      } else {
+        Button("Disconnect") { model.uninstallStatusLine() }
+      }
+    }
+  }
+}
+
+/// Section title with an SF Symbol. New sections (clutter, cleanup) reuse it.
+private struct SectionHeader: View {
+  let title: String
+  let symbol: String
+  var body: some View {
+    Label(title, systemImage: symbol).font(.headline).foregroundStyle(.primary)
+  }
+}
+
+/// Title, live value, slider with range hints, and a one-line explanation.
+private struct SliderRow: View {
+  @Environment(\.isEnabled) private var isEnabled
+  let title: String
+  let caption: String
+  let value: Binding<Double>
+  let range: ClosedRange<Double>
+  let minLabel: String
+  let maxLabel: String
+  let readout: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .firstTextBaseline) {
+        Text(title)
+        Spacer()
+        Text(readout).monospacedDigit().foregroundStyle(.secondary)
+      }
+      HStack(spacing: 8) {
+        Text(minLabel).frame(minWidth: 32, alignment: .leading).accessibilityHidden(true)
+        Slider(value: value, in: range) { Text(title) }
+          .labelsHidden()
+          .accessibilityValue(readout)
+        Text(maxLabel).frame(minWidth: 32, alignment: .trailing).accessibilityHidden(true)
+      }
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      Text(caption)
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .opacity(isEnabled ? 1 : 0.5)
+    .padding(.vertical, 2)
+  }
+}
+
+private enum ConnectionState {
+  case good(String)
+  case warning(String)
+  case off(String)
+  var text: String {
+    switch self {
+    case .good(let t), .warning(let t), .off(let t): return t
+    }
+  }
+  var color: Color {
+    switch self {
+    case .good: return .green
+    case .warning: return .orange
+    case .off: return .secondary
+    }
+  }
+  var symbol: String {
+    switch self {
+    case .good: return "checkmark.circle.fill"
+    case .warning: return "exclamationmark.triangle.fill"
+    case .off: return "circle.dashed"
+    }
+  }
+}
+
+/// One Claude Code hook-up: what it is, a coloured state, and its actions (primary last).
+private struct ConnectionRow<Actions: View>: View {
+  let title: String
+  let caption: String
+  let state: ConnectionState
+  @ViewBuilder let actions: Actions
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 12) {
+      VStack(alignment: .leading, spacing: 3) {
+        Text(title)
+        Text(caption).font(.callout).foregroundStyle(.secondary)
+        Label(state.text, systemImage: state.symbol)
+          .font(.callout.weight(.medium))
+          .foregroundStyle(state.color)
+      }
+      .fixedSize(horizontal: false, vertical: true)
+      .accessibilityElement(children: .combine)
+      Spacer(minLength: 8)
+      HStack(spacing: 8) { actions }.fixedSize()
+    }
+    .padding(.vertical, 2)
   }
 }
 
@@ -267,9 +419,9 @@ final class SettingsWindowController {
       let hosting = NSHostingController(rootView: SettingsView(model: model))
       let w = NSWindow(contentViewController: hosting)
       w.title = "Claudette Settings"
-      w.styleMask = [.titled, .closable]
+      w.styleMask = [.titled, .closable, .resizable]
       w.isReleasedWhenClosed = false
-      w.setContentSize(NSSize(width: 460, height: 740))
+      w.setContentSize(NSSize(width: 500, height: 680))
       window = w
     }
     model.refresh()

@@ -19,14 +19,24 @@ Claude Code  ──hooks (http)──────────────┐
 
 ## Data flow
 
-1. The generated Claude Code plugin registers `http` hooks for the events in
-   `PluginInstaller.events`. Each hook POSTs the event JSON to `/hook`; the server answers with an
-   empty 2xx immediately, so Claude Code is never held up (a closed app is a non-blocking error).
+1. The generated Claude Code plugin registers `command` hooks for the events in
+   `PluginInstaller.events`, all running `hooks/post.sh`: it reads the event, POSTs it to `/hook` with
+   a detached background `curl`, prints nothing and always exits 0, so Claude Code is never held up
+   and a closed app produces no hook error. (Older installs used `http` hooks; `isLegacy` detects them
+   and Settings offers the update.) The server answers with an empty 2xx immediately.
 2. The status line wrapper script (written by `StatusLineInstaller`) forwards the status line JSON
    to `/status` in the background, then runs the user's original status line command unchanged.
 3. `AppModel` decodes each message on the main thread and feeds `SessionStore` (sessions, tools,
    sub-agents, approvals, errors) and `LimitsModel` (usage windows). The resulting
    `SessionChange` values drive `Stage`; limit transitions drive `LimitsHUD`.
+
+## Overlay targets
+
+`Draggable` (app) is the hit-test contract for anything on the overlay besides the avatars: `hitRect`
+in global coordinates, hover enter/exit, and a drag. `Stage.draggables` holds them (avatars win when
+both are under the pointer); today that is the weekly moon (`MoonHandle`, position stored as a fraction
+of the main display in settings). Item labels are drawn once per text by `LabelTexture` (one soft
+`NSShadow`, cached), not by live effect nodes.
 
 ## Rules worth knowing
 
@@ -70,6 +80,8 @@ PNG's pixel size). The PNGs and manifest are committed, so building the app need
 | `CLAUDETTE_DEBUG_MODELS=opus,sonnet,haiku` | gives spawned sessions those models in turn (outfits) |
 | `CLAUDETTE_ART=dir` | art export to use first; `CLAUDETTE_DEBUG_ART=off` forces the shape placeholders |
 | `APP_OUT=dir scripts/bundle.sh` | builds the app bundle somewhere other than `build/Claudette.app` |
+| `CLAUDETTE_DEBUG_MOONDRAG=1` | drags the moon (first `Draggable`) to the screen centre through the real code path |
+| `Claudette --render-props <png>` | draws every prop kind on a light and a dark backdrop (label legibility), then exits |
 | `CLAUDETTE_DEBUG_DRAGTEST=1` | drags the first character across the screen using the real code path |
 | `CLAUDETTE_LOG_EVENTS=1` | logs raw payloads to `~/Library/Logs/Claudette/events.jsonl` (off by default: prompts) |
 | `CLAUDETTE_HOME=dir` | redirects every `~/.claude` and Application Support path (sandbox for testing) |
