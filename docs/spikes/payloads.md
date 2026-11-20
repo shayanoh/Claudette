@@ -33,13 +33,17 @@ Headless (`-p`) mode only so far; interactive-only behaviour is listed under "No
 - **`StopFailure` payload**: the error type is in the field **`error`** (e.g. `"authentication_failed"`), plus
   `last_assistant_message`, `prompt_id`, `effort`, `transcript_path`. (The code first read `error_type`, which was wrong.)
 
+- **Live usage limits work** (confirmed by the user in a real interactive session, 2026-11-20): the status line
+  wrapper delivers `rate_limits` and the jar/moon/menubar glyph follow it.
+- **Real mouse dragging works** (confirmed by the user, 2026-11-20): click, drag and drop on a character reach the
+  overlay panel (so transparent-pixel pass-through and focus handling are fine on macOS 15.7).
+
 ## Not yet confirmed (need an interactive session or a forced failure)
 
 - `SessionStart` did **not** arrive in `-p` mode (SessionStore must auto-create sessions from any event; it does).
 - `Notification` (`permission_prompt`, `idle_prompt`), `Elicitation`, `PreCompact/PostCompact`, `PreModelSwitch`.
 - `background_tasks[]` element shape; whether `run_in_background` appears in Bash `tool_input`.
 - Hook latency under load (no slowdown noticed in these runs).
-- Status line `rate_limits` capture (Task 7).
 
 ## Consequences for the code
 

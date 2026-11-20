@@ -43,7 +43,7 @@ restore it exactly.
 ## Known gaps
 
 See `docs/spikes/payloads.md`. In short: pure network disconnects are not reported by any Claude Code
-hook, real mouse clicks on the overlay still need a hands-on check on each macOS version, and a few
+hook, the overlay's click handling has only been hand-checked on one macOS version (15.7), and a few
 hook payloads (`StopFailure`, `Notification`, interactive `SessionStart`) were confirmed from the
 documentation but not yet from live traffic.
 
