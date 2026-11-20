@@ -5,7 +5,7 @@ Run from anywhere: python3 art/generate.py
 Writes art/build/<name>.svg (scratch), art/export/<name>.png, manifest.json, sheet.png.
 Positions/parents/z mirror PuppetNode.build() (points, y up, origin = centre of her feet).
 """
-import base64, json, math, os, struct, subprocess, sys
+import base64, json, math, os, shutil, struct, subprocess, sys
 
 SCALE = 2  # pixels per point
 
@@ -20,7 +20,13 @@ import outfits as O  # noqa: E402
 
 BUILD = os.path.join(HERE, "build")
 EXPORT = os.path.join(HERE, "export")
-RSVG = "/usr/local/bin/rsvg-convert"
+# PATH first, then the usual Homebrew prefixes (Apple Silicon /opt/homebrew, Intel /usr/local).
+RSVG = shutil.which("rsvg-convert") or next(
+    (p for p in ("/opt/homebrew/bin/rsvg-convert", "/usr/local/bin/rsvg-convert") if os.path.exists(p)),
+    None,
+)
+if RSVG is None:
+    raise SystemExit("rsvg-convert not found (brew install librsvg)")
 MARGIN = 1.0  # extra transparent points around every drawn extent, for antialiasing
 
 # Rig constants from PuppetNode.build().
