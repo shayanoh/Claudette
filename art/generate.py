@@ -14,6 +14,7 @@ sys.dont_write_bytecode = True  # keep art/src free of __pycache__
 sys.path.insert(0, os.path.join(HERE, "src"))
 import parts as P  # noqa: E402
 import props as R  # noqa: E402
+import status as St  # noqa: E402
 
 BUILD = os.path.join(HERE, "build")
 EXPORT = os.path.join(HERE, "export")
@@ -38,10 +39,10 @@ PARTS = {
     "mouth": (P.mouth, "face", (0, 35), 1),
     "spark": (P.spark, "root", (0, LEG_Y + P.BODY_H + 30), 5),
     "bag": (P.bag, "bodyPivot", (-82, 96), -1),
-    "bag_fill": (P.bag_fill, "bag", (0, 2), 0),
+    "bag_fill": (P.bag_fill, "bag", (0, P.BAG_FILL_Y), -1),  # behind the bag, seen through its window
     "jar_glass": (P.jar_glass, None, None, 1),
-    "jar_fill": (P.jar_fill, "jar_glass", (0, 2), 0),
-    "jar_lid": (P.jar_lid, "jar_glass", (0, 34), 2),
+    "jar_fill": (P.jar_fill, "jar_glass", (0, 2), -1),  # behind the glass so sheen stays on top
+    "jar_lid": (P.jar_lid, "jar_glass", (0, 33), 2),  # 1 pt overlap seats it on the rim
     "moon_dark": (P.moon_dark, None, None, 0),
     "moon_lit": (P.moon_lit, None, None, 1),
 }
@@ -100,6 +101,16 @@ PROPS = {
        for n in ("generic", "github", "playwright", "figma", "context7")},
     "prop_mcp_cable": (R.prop_mcp_cable, "plug", False, True),
 }
+# Status art: same contract. Bubbles anchor on the tail tip ("tip"); pills/relief carry an
+# explicit label point (y up, from the anchor) for runtime text.
+STATUS = {
+    "status_bang": (St.status_bang, "tip", False, False),
+    "status_question": (St.status_question, "tip", False, False),
+    **{f"status_err_{n}": (getattr(St, f"status_err_{n}"), "centre", St.PILL_LABEL, False)
+       for n in ("api", "auth", "billing", "ratelimit", "offline", "unknown")},
+    "status_relief": (St.status_relief, "centre", St.RELIEF_LABEL, False),
+}
+TOP = {**PROPS, **STATUS}
 
 
 def symmetric(box, kind):
@@ -176,7 +187,7 @@ def export():
             if parent:
                 a.update(parent=parent, position=list(pos))
         assets[name] = a
-    for name, (draw, kind, label, tint) in PROPS.items():
+    for name, (draw, kind, label, tint) in TOP.items():
         frag, box = draw()
         x0, y0, w, h = canvas(symmetric(box, kind), kind == "tip", kind == "plug")
         svg = os.path.join(BUILD, f"{name}.svg")
@@ -185,8 +196,10 @@ def export():
         anchor = [round(-x0 / w, 6), round((y0 + h) / h, 6)]
         assert anchor == {"centre": [0.5, 0.5], "tip": [0.5, 0.0], "plug": [0.0, 0.5]}[kind], (name, anchor)
         a = dict(file=file_name(name), size=[w, h], anchor=anchor)
-        if label:
+        if label is True:  # caption centred under the prop
             a["label"] = [0, -(h / 2 + 5)]
+        elif label:
+            a["label"] = list(label)
         if tint:
             a["tint"] = True
         assets[name] = a
@@ -222,16 +235,17 @@ def image(a, uri, left, top, k=1, sy=1):
             f'preserveAspectRatio="none" href="{uri}"/>')
 
 
-def figure(assets, uris, names, cx, ground, k, swap=None):
+def figure(assets, uris, names, cx, ground, k, swap=None, levels=None):
     """Place sprites by the manifest (k = zoom). swap: base name -> variant texture."""
     swap = swap or {}
+    levels = LEVEL if levels is None else levels
     placed = []
     for name in names:
         a = assets[name]
         x, y, z, depth = world(name, assets)
         w, h = a["size"]
         left = cx + (x - a["anchor"][0] * w) * k
-        sy = LEVEL.get(name, 1)  # fills are yScaled about their bottom anchor
+        sy = levels.get(name, 1)  # fills are yScaled about their bottom anchor
         top = ground - (y + (1 - a["anchor"][1]) * h * sy) * k
         # SpriteKit: higher global z on top; on ties a child draws after its parent.
         placed.append((z, depth, name, image(a, uris[swap.get(name, name)], left, top, k, sy)))
@@ -263,11 +277,13 @@ def sheet(manifest):
     fig_h, pose_h = 360, 200
     ch = cell // 2
     prop_cols, prop_cell, pk = 7, (W - 2 * pad) // 7, 2.0
-    prop_rows = math.ceil(len(PROPS) / prop_cols)
+    groups = [list(PROPS), list(STATUS)]
+    prop_rows = sum(math.ceil(len(g) / prop_cols) for g in groups)
+    fills = [("bag", 0), ("bag", 0.4), ("bag", 1), ("jar_glass", 0.4), ("jar_glass", 1)]
     tints = [n for n in PROPS if PROPS[n][3]]
     tint_cols, tint_cell = 9, (W - 2 * pad) // 9
     tint_rows = math.ceil(len(tints) * len(TINTS) / tint_cols)
-    props_h = prop_rows * 2 * prop_cell + tint_rows * tint_cell
+    props_h = (prop_rows + 1) * 2 * prop_cell + tint_rows * tint_cell
     H = pad + fig_h + pad + pose_h + pad + props_h + pad + rows * (ch + 40) + pad
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">',
          '<defs>'
@@ -304,8 +320,8 @@ def sheet(manifest):
         w, h = a["size"]
         left, top = cx - a["anchor"][0] * w * k, cy - (1 - a["anchor"][1]) * h * k
         return image(a, uris[name], left, top, k).replace("<image ", f"<image {extra} ")
-    for r in range(prop_rows):
-        row = list(PROPS)[r * prop_cols:(r + 1) * prop_cols]
+    prop_grid = [g[i:i + prop_cols] for g in groups for i in range(0, len(g), prop_cols)]
+    for r, row in enumerate(prop_grid):
         for j, bg in enumerate(("#F4F4F6", "#2A2F45")):
             ry = y + (2 * r + j) * prop_cell
             o.append(f'<rect x="{pad}" y="{ry}" width="{W-2*pad}" height="{prop_cell}" fill="{bg}"/>')
@@ -313,15 +329,27 @@ def sheet(manifest):
                 a = assets[name]
                 cx = pad + (i + 0.5) * prop_cell
                 cy = ry + prop_cell / 2 - (8 if a.get("label") else 0)
-                if PROPS[name][1] != "centre":  # tip/plug pivots: centre the sprite in the cell
-                    w, h = a["size"]
-                    cx += (a["anchor"][0] - 0.5) * w * pk
-                    cy += (0.5 - a["anchor"][1]) * h * pk
-                o.append(put(name, cx, cy, pk))
+                w, h = a["size"]
+                kk = min(pk, (prop_cell - 8) / w)  # wide pills shrink to fit the cell
+                if TOP[name][1] != "centre":  # tip/plug pivots: centre the sprite in the cell
+                    cx += (a["anchor"][0] - 0.5) * w * kk
+                    cy += (0.5 - a["anchor"][1]) * h * kk
+                o.append(put(name, cx, cy, kk))
                 if a.get("label"):
-                    lx, ly = cx + a["label"][0] * pk, cy - a["label"][1] * pk
+                    lx, ly = cx + a["label"][0] * kk, cy - a["label"][1] * kk
                     o.append(f'<rect x="{lx-18}" y="{ly-4}" width="36" height="8" rx="4" fill="#8A8FA3"/>')
     y += prop_rows * 2 * prop_cell
+    # Fill-level check at 2.5x: bag 0/40/100% through its window, jar 40/100% under the glass.
+    kids = {"bag": ["bag", "bag_fill"], "jar_glass": ["jar_glass", "jar_fill", "jar_lid"]}
+    for j, bg in enumerate(("#F4F4F6", "#2A2F45")):
+        ry = y + j * prop_cell
+        o.append(f'<rect x="{pad}" y="{ry}" width="{W-2*pad}" height="{prop_cell}" fill="{bg}"/>')
+        for i, (base, lvl) in enumerate(fills):
+            wx, wy = world(base, assets)[:2]
+            cx, ground, k = pad + (i + 0.5) * prop_cell, ry + prop_cell - 22, 2.5
+            o.append(figure(assets, uris, kids[base], cx - wx * k, ground + wy * k, k,
+                            levels={kids[base][1]: lvl}))
+    y += 2 * prop_cell
     # Tint check: SpriteKit colorBlendFactor 1 multiplies the texture by the colour.
     o.append("<defs>" + "".join(
         f'<filter id="t{i}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="'

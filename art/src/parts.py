@@ -215,24 +215,39 @@ def mouth_wobble():
 TAN, TAN_D, FILL = "#D8B98A", "#B8956A", "#F08A4B"
 
 
+# Pocket window in the bag's front panel (y down, bag pivot = visible bottom edge).
+BAG_WIN = (-6, -13, 12, 9, 3)  # x, y, w, h, r: spans 4..13 pt above the bag's bottom
+
+
 def bag():
-    """Little backpack, about 22x28 visible: tan body, flap with a buckle, cel strip."""
+    """Little backpack, about 22x28 visible: tan body with a see-through pocket window,
+    flap, strap and buckle. bag_fill sits behind it (z -1) and shows through the window."""
     w, h = 22, 28
     x, y, iw, ih = -w / 2 + HALF, -h + HALF, w - INK, h - INK  # stroke centred inside the visible box
     d = rr(x, y, iw, ih, 5)
+    win = rr(*BAG_WIN)
     flap = f"M{x},{y+10} V{y+4} Q{x},{y} {x+4},{y} H{x+iw-4} Q{x+iw},{y} {x+iw},{y+4} V{y+10} Q0,{y+14} {x},{y+10} Z"
-    svg = (f'<defs><clipPath id="bagClip"><path d="{d}"/></clipPath></defs>'
-           f'<path d="{d}" fill="{TAN}"/>'
+    svg = (f'<defs><clipPath id="bagClip"><path d="{d} {win}" clip-rule="evenodd"/></clipPath></defs>'
+           f'<path d="{d} {win}" fill="{TAN}" fill-rule="evenodd"/>'
            f'<g clip-path="url(#bagClip)"><rect x="{x+iw-4}" y="{y}" width="4" height="{ih}" fill="{TAN_D}"/>'
-           f'<path d="{flap}" fill="{TAN_D}" stroke="{C["outline"]}" stroke-width="2"/></g>'
-           f'<rect x="-2.5" y="{y+9}" width="5" height="5" rx="1" fill="{C["light"]}" stroke="{C["outline"]}" stroke-width="1.6"/>'
+           f'<path d="{flap}" fill="{TAN_D}" stroke="{C["outline"]}" stroke-width="2"/>'
+           f'<rect x="-1.6" y="{y+10}" width="3.2" height="{BAG_WIN[1]-y-10}" fill="{TAN_D}"/></g>'
+           f'<path d="{win}" fill="none" stroke="{C["outline"]}" stroke-width="2"/>'
+           f'<rect x="-2.5" y="{y+8.5}" width="5" height="5" rx="1" fill="{C["light"]}" stroke="{C["outline"]}" stroke-width="1.6"/>'
            f'<path d="{d}" fill="none" stroke="{C["outline"]}" stroke-width="{INK}" stroke-linejoin="round"/>')
     return svg, (-w / 2, -h, w / 2, 0)
 
 
 def bag_fill():
-    """Flat fill level, no outline; code scales it in Y."""
-    return f'<path d="{rr(-9, -24, 18, 24, 3)}" fill="{FILL}"/>', (-9, -24, 9, 0)
+    """Flat fill, no outline, drawn behind the bag. Its bottom is the window's bottom and at
+    yScale 1 it reaches just under the window's top ink; wider than the window so the
+    sides stay hidden behind the panel."""
+    wx, wy, ww, wh, _r = BAG_WIN
+    fh = wh + 0.5
+    return f'<rect x="{wx-1}" y="{-fh}" width="{ww+2}" height="{fh}" fill="{FILL}"/>', (wx - 1, -fh, wx + ww + 1, 0)
+
+
+BAG_FILL_Y = -(BAG_WIN[1] + BAG_WIN[3])  # window bottom, points above the bag's pivot (y up)
 
 
 def jar_glass():

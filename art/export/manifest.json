@@ -60,13 +60,13 @@
       "parent": "bag",
       "position": [
         0,
-        2
+        4
       ],
       "size": [
-        20,
-        25
+        16,
+        11
       ],
-      "z": 0
+      "z": -1
     },
     "blush_L": {
       "anchor": [
@@ -288,7 +288,7 @@
         20,
         31
       ],
-      "z": 0
+      "z": -1
     },
     "jar_glass": {
       "anchor": [
@@ -311,7 +311,7 @@
       "parent": "jar_glass",
       "position": [
         0,
-        34
+        33
       ],
       "size": [
         28,
@@ -824,6 +824,133 @@
         30
       ],
       "z": 5
+    },
+    "status_bang": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "status_bang.png",
+      "size": [
+        40,
+        43
+      ]
+    },
+    "status_err_api": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "status_err_api.png",
+      "label": [
+        11.0,
+        0
+      ],
+      "size": [
+        90,
+        30
+      ]
+    },
+    "status_err_auth": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "status_err_auth.png",
+      "label": [
+        11.0,
+        0
+      ],
+      "size": [
+        90,
+        30
+      ]
+    },
+    "status_err_billing": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "status_err_billing.png",
+      "label": [
+        11.0,
+        0
+      ],
+      "size": [
+        90,
+        30
+      ]
+    },
+    "status_err_offline": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "status_err_offline.png",
+      "label": [
+        11.0,
+        0
+      ],
+      "size": [
+        90,
+        30
+      ]
+    },
+    "status_err_ratelimit": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "status_err_ratelimit.png",
+      "label": [
+        11.0,
+        0
+      ],
+      "size": [
+        90,
+        30
+      ]
+    },
+    "status_err_unknown": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "status_err_unknown.png",
+      "label": [
+        11.0,
+        0
+      ],
+      "size": [
+        90,
+        30
+      ]
+    },
+    "status_question": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "status_question.png",
+      "size": [
+        40,
+        43
+      ]
+    },
+    "status_relief": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "status_relief.png",
+      "label": [
+        0,
+        1
+      ],
+      "size": [
+        46,
+        30
+      ]
     }
   },
   "scale": 2,

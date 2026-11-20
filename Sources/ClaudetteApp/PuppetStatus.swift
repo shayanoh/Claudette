@@ -11,10 +11,18 @@ extension PuppetNode {
     arms.last?.zRotation = 0
     spark.isHidden = false
     switch phase {
-    case .needsApproval: badge(text: "!", color: Palette.approval, wave: true)
-    case .hasQuestion: badge(text: "?", color: Palette.question, wave: true)
+    case .needsApproval:
+      if !badgeArt(ArtNames.bangBubble, text: nil, wave: true) {
+        badge(text: "!", color: Palette.approval, wave: true)
+      }
+    case .hasQuestion:
+      if !badgeArt(ArtNames.questionBubble, text: nil, wave: true) {
+        badge(text: "?", color: Palette.question, wave: true)
+      }
     case .error(let kind):
-      badge(text: Self.errorText(kind), color: Palette.error, wave: false, pill: true)
+      if !badgeArt(ArtNames.errorPill(kind), text: Self.errorText(kind), wave: false) {
+        badge(text: Self.errorText(kind), color: Palette.error, wave: false, pill: true)
+      }
     default: break
     }
   }
@@ -28,6 +36,50 @@ extension PuppetNode {
     case .disconnect: return "offline"
     case .unknown: return "error"
     }
+  }
+
+  /// Art version of the badge. Returns false (nothing added) when the asset is missing.
+  private func badgeArt(_ assetName: String, text: String?, wave: Bool) -> Bool {
+    guard let lib = ArtLibrary.shared, let asset = lib.asset(assetName),
+      let sprite = lib.sprite(assetName)
+    else { return false }
+    spark.isHidden = true
+    let node = SKNode()
+    node.name = "badge"
+    // Bubbles are anchored on their tail tip (anchor y 0): the tip sits just above her head.
+    node.position =
+      asset.anchor[1] == 0
+      ? CGPoint(x: 0, y: Self.legLength + Self.bodySize.height + 6) : spark.position
+    node.zPosition = 8
+    node.addChild(sprite)
+    sprite.position = .zero
+    if let text, let l = asset.label {
+      let label = SKLabelNode(text: text)
+      label.fontName = "AvenirNext-Bold"
+      label.fontSize = 11
+      label.fontColor = .white
+      label.verticalAlignmentMode = .center
+      label.position = CGPoint(x: l[0], y: l[1])
+      label.zPosition = 1
+      node.addChild(label)
+    }
+    node.run(
+      .repeatForever(
+        .sequence([.moveBy(x: 0, y: 4, duration: 0.5), .moveBy(x: 0, y: -4, duration: 0.5)])))
+    addChild(node)
+    if wave { startWaving() }
+    return true
+  }
+
+  private func startWaving() {
+    guard let arm = arms.last else { return }
+    arm.run(
+      .repeatForever(
+        .sequence([.rotate(toAngle: 0.9, duration: 0.25), .rotate(toAngle: 0.2, duration: 0.25)])),
+      withKey: "wave")
+    run(
+      .repeatForever(.sequence([.wait(forDuration: 8), .run { [weak self] in self?.hop() }])),
+      withKey: "attention")
   }
 
   private func badge(text: String, color: NSColor, wave: Bool, pill: Bool = false) {
@@ -57,14 +109,7 @@ extension PuppetNode {
       .repeatForever(
         .sequence([.moveBy(x: 0, y: 4, duration: 0.5), .moveBy(x: 0, y: -4, duration: 0.5)])))
     addChild(node)
-    guard wave, let arm = arms.last else { return }
-    arm.run(
-      .repeatForever(
-        .sequence([.rotate(toAngle: 0.9, duration: 0.25), .rotate(toAngle: 0.2, duration: 0.25)])),
-      withKey: "wave")
-    run(
-      .repeatForever(.sequence([.wait(forDuration: 8), .run { [weak self] in self?.hop() }])),
-      withKey: "attention")
+    if wave { startWaving() }
   }
 
   /// Relieved sigh after an error clears or the context was compacted.
@@ -75,8 +120,24 @@ extension PuppetNode {
     l.fontColor = .white
     l.position = CGPoint(x: -70, y: Self.legLength + Self.bodySize.height + 10)
     l.zPosition = 9
-    addChild(l)
-    l.run(
+    var floater: SKNode = l
+    if let lib = ArtLibrary.shared, let puff = lib.sprite("status_relief") {
+      // The puff carries the word: label inside the puff's interior slot.
+      let holder = SKNode()
+      holder.position = l.position
+      holder.zPosition = 9
+      l.position = lib.asset("status_relief")?.label.map { CGPoint(x: $0[0], y: $0[1]) } ?? .zero
+      l.fontColor = Palette.ink
+      l.fontSize = 11
+      l.verticalAlignmentMode = .center
+      l.zPosition = 1
+      puff.position = .zero
+      holder.addChild(puff)
+      holder.addChild(l)
+      floater = holder
+    }
+    addChild(floater)
+    floater.run(
       .sequence([
         .group([.moveBy(x: -10, y: 30, duration: 1.2), .fadeOut(withDuration: 1.2)]),
         .removeFromParent(),

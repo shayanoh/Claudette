@@ -185,7 +185,7 @@ final class PropNode: SKNode {
       body.addChild(gem)
       label(name(skill, privacy))
     case .mcp(let server, _):
-      let hue = CGFloat(abs(server.hashValue % 360)) / 360
+      let hue = CGFloat(Accent.hue(forProject: server))
       body.addChild(
         shape(
           CGRect(x: -17, y: -20, width: 34, height: 40),
