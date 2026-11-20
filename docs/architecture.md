@@ -67,6 +67,11 @@ of the main display in settings). Item labels are drawn once per text by `LabelT
   JSON) and uninstall restores the original bytes when the file is unchanged since install.
 - Heavy-session check (2026-11-20, debug build, Intel i7): 80 items around one Claudette idle at
   about 2.5% CPU and 51 MB.
+- 10-minute soak (2026-11-21, debug build, Intel i7, 80 fake items plus this repo's live Claude Code
+  events, several automatic and one manual cleanup): CPU 2 to 17% (spikes while cleanups and
+  walking run), resident memory 50 MB at the start, 75 MB after 5 minutes, 104 MB at 10 minutes.
+  Memory is **not flat**: it grew in steps and was not yet explained (item count is capped at 80;
+  suspects are cached label textures and nodes left after cleanups). The 30-minute soak is still to do.
 - Rendering pauses when nothing is on screen (0% CPU) and in Focus mode.
 
 ## Art pipeline
