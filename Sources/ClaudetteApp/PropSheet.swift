@@ -67,13 +67,12 @@ extension PropSheet {
         scene.addChild(puppet)
       }
     }
-    // Thinking bubble, project name tag and a small sub-agent.
+    // Thinking bubble and a small sub-agent.
     let thinker = PuppetNode()
     thinker.setScale(0.8)
     thinker.position = CGPoint(x: 800, y: 50)
     thinker.zPosition = 200
     thinker.think(true)
-    thinker.setNameTag("Claudette")
     scene.addChild(thinker)
     let sub = PuppetNode()
     sub.setScale(0.8 * 0.55)

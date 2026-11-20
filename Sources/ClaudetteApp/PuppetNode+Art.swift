@@ -432,31 +432,4 @@ extension PuppetNode {
     }
     addChild(bubble)
   }
-
-  /// The project (folder or worktree) name under her feet; nil hides it.
-  func setNameTag(_ text: String?) {
-    let name = "nametag"
-    guard let text, let entry = LabelTexture.entry(text, size: 12) else {
-      childNode(withName: name)?.run(
-        .sequence([.fadeOut(withDuration: 0.12), .removeFromParent()]), withKey: "fade")
-      return
-    }
-    if let existing = childNode(withName: name) as? SKSpriteNode,
-      existing.userData?["text"] as? String == text
-    {
-      existing.removeAction(forKey: "fade")
-      existing.alpha = 1
-      return
-    }
-    childNode(withName: name)?.removeFromParent()
-    let tag = SKSpriteNode(texture: entry.texture, size: entry.size)
-    tag.name = name
-    tag.userData = ["text": text]
-    tag.anchorPoint = CGPoint(x: 0.5, y: 1)
-    tag.position = CGPoint(x: 0, y: LabelTexture.padding - 4)
-    tag.zPosition = 30
-    tag.alpha = 0
-    addChild(tag)
-    tag.run(.fadeIn(withDuration: 0.12), withKey: "fade")
-  }
 }

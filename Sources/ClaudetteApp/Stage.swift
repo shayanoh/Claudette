@@ -27,6 +27,9 @@ final class Actor {
   var cleaning: CleanupRun?
   /// What she carries to the can (up to three, stacked in front of her).
   var armful: [ItemNode] = []
+  /// The project name under her feet while the pointer is over her. It lives in the scene, not in
+  /// her puppet: the hover fade lowers her alpha and a child would fade with her.
+  var nameTag: SKSpriteNode?
   /// The window she is sitting on and the spot on its top edge.
   var perch: (window: WindowFrame, spot: CGPoint)?
   /// What she is heading to or working on (lets a dragged item re-target her).
@@ -222,6 +225,7 @@ final class Stage {
   private func removeActor(_ id: String) {
     guard let a = actors.removeValue(forKey: id) else { return }
     if dragging === a { dragging = nil }
+    a.nameTag?.removeFromParent()
     world.release(a)
     for sub in a.subs.values {
       world.release(sub)
@@ -292,6 +296,7 @@ final class Stage {
       applyDisplayParent(a)
     }
     a.puppet.position = scenePosition(a)
+    placeNameTag(a)
   }
 
   /// A sub-agent is a small actor in the same scene, free to roam near its parent.
@@ -339,6 +344,40 @@ final class Stage {
     topZ += 200
     a.puppet.zPosition = topZ
     for sub in a.subs.values { sub.puppet.zPosition = topZ + 100 }
+  }
+
+  /// Shows (or hides, with nil) the project name under her feet, fully opaque however faded she is.
+  func setNameTag(_ a: Actor, _ text: String?) {
+    guard let text, let entry = LabelTexture.entry(text, size: 12),
+      let scene = overlay.overlays[a.display]?.scene
+    else {
+      if let tag = a.nameTag {
+        a.nameTag = nil
+        tag.run(.sequence([.fadeOut(withDuration: 0.12), .removeFromParent()]))
+      }
+      return
+    }
+    if let tag = a.nameTag, tag.userData?["text"] as? String == text, tag.parent === scene {
+      placeNameTag(a)
+      return
+    }
+    a.nameTag?.removeFromParent()
+    let tag = SKSpriteNode(texture: entry.texture, size: entry.size)
+    tag.userData = ["text": text]
+    tag.anchorPoint = CGPoint(x: 0.5, y: 1)
+    tag.zPosition = Stage.overlayZ - 50  // above every Claudette
+    tag.alpha = 0
+    scene.addChild(tag)
+    tag.run(.fadeIn(withDuration: 0.12))
+    a.nameTag = tag
+    placeNameTag(a)
+  }
+
+  /// Keeps the tag centred under her feet as she moves.
+  func placeNameTag(_ a: Actor) {
+    guard let tag = a.nameTag else { return }
+    let p = scenePosition(a)
+    tag.position = CGPoint(x: p.x, y: p.y + LabelTexture.padding - 4)
   }
 
   /// Keeps her feet at `p` inside a screen (a walk target near the edge must stay reachable).
@@ -496,8 +535,7 @@ final class Stage {
         a,
         on: inside && s.hoverFadeEnabled
           && (!s.dodgeEnabled || reduceMotion || cornered || modifiers.contains(.option)))
-      a.puppet.setNameTag(
-        inside && s.showProjectName && !a.projectName.isEmpty ? a.projectName : nil)
+      setNameTag(a, inside && s.showProjectName && !a.projectName.isEmpty ? a.projectName : nil)
       trackPetting(a, inside: inside, at: p)
     }
   }
