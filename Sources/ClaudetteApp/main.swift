@@ -19,6 +19,22 @@ if let i = args.firstIndex(of: "--write-plugin") {
   }
 }
 
+// Developer helper: `Claudette --validate-art <dir>` checks an art export and exits.
+if let i = args.firstIndex(of: "--validate-art") {
+  guard i + 1 < args.count else {
+    FileHandle.standardError.write(Data("usage: Claudette --validate-art <dir>\n".utf8))
+    exit(2)
+  }
+  do {
+    let n = try ArtCheck.validate(dir: URL(fileURLWithPath: args[i + 1]))
+    print("OK: \(n) assets")
+    exit(0)
+  } catch {
+    FileHandle.standardError.write(Data("art invalid: \(error)\n".utf8))
+    exit(1)
+  }
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

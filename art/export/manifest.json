@@ -1,0 +1,244 @@
+{
+  "assets": {
+    "arm_L": {
+      "anchor": [
+        0.714286,
+        0.5
+      ],
+      "file": "arm_L.png",
+      "parent": "bodyPivot",
+      "position": [
+        -70,
+        52
+      ],
+      "size": [
+        35,
+        30
+      ],
+      "z": 0
+    },
+    "arm_R": {
+      "anchor": [
+        0.285714,
+        0.5
+      ],
+      "file": "arm_R.png",
+      "parent": "bodyPivot",
+      "position": [
+        70,
+        52
+      ],
+      "size": [
+        35,
+        30
+      ],
+      "z": 0
+    },
+    "blush_L": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "blush_L.png",
+      "parent": "face",
+      "position": [
+        -52,
+        32
+      ],
+      "size": [
+        22,
+        12
+      ],
+      "z": 0
+    },
+    "blush_R": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "blush_R.png",
+      "parent": "face",
+      "position": [
+        52,
+        32
+      ],
+      "size": [
+        22,
+        12
+      ],
+      "z": 0
+    },
+    "body": {
+      "anchor": [
+        0.5,
+        0.037037
+      ],
+      "file": "body.png",
+      "parent": "bodyPivot",
+      "position": [
+        0,
+        0
+      ],
+      "size": [
+        158,
+        108
+      ],
+      "z": 1
+    },
+    "eye_L": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_L.png",
+      "parent": "face",
+      "position": [
+        -30,
+        48
+      ],
+      "size": [
+        20,
+        36
+      ],
+      "z": 1
+    },
+    "eye_R": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_R.png",
+      "parent": "face",
+      "position": [
+        30,
+        48
+      ],
+      "size": [
+        20,
+        36
+      ],
+      "z": 1
+    },
+    "leg_0": {
+      "anchor": [
+        0.5,
+        0.692308
+      ],
+      "file": "leg_0.png",
+      "parent": "root",
+      "position": [
+        -51,
+        23
+      ],
+      "size": [
+        22,
+        39
+      ],
+      "z": -1
+    },
+    "leg_1": {
+      "anchor": [
+        0.5,
+        0.692308
+      ],
+      "file": "leg_1.png",
+      "parent": "root",
+      "position": [
+        -22,
+        23
+      ],
+      "size": [
+        22,
+        39
+      ],
+      "z": -1
+    },
+    "leg_2": {
+      "anchor": [
+        0.5,
+        0.692308
+      ],
+      "file": "leg_2.png",
+      "parent": "root",
+      "position": [
+        22,
+        23
+      ],
+      "size": [
+        22,
+        39
+      ],
+      "z": -1
+    },
+    "leg_3": {
+      "anchor": [
+        0.5,
+        0.692308
+      ],
+      "file": "leg_3.png",
+      "parent": "root",
+      "position": [
+        51,
+        23
+      ],
+      "size": [
+        22,
+        39
+      ],
+      "z": -1
+    },
+    "mouth": {
+      "anchor": [
+        0.5,
+        0.6
+      ],
+      "file": "mouth.png",
+      "parent": "face",
+      "position": [
+        0,
+        35
+      ],
+      "size": [
+        14,
+        10
+      ],
+      "z": 1
+    },
+    "shadow": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "shadow.png",
+      "parent": "root",
+      "position": [
+        0,
+        -2
+      ],
+      "size": [
+        176,
+        44
+      ],
+      "z": -10
+    },
+    "spark": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "spark.png",
+      "parent": "root",
+      "position": [
+        0,
+        153
+      ],
+      "size": [
+        30,
+        30
+      ],
+      "z": 5
+    }
+  },
+  "scale": 2,
+  "version": 1
+}
