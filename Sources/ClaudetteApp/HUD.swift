@@ -263,6 +263,7 @@ final class LimitsHUD {
 
   private func setNight(_ on: Bool) {
     guard on != dimmed else { return }
+    stage.noteActivity()
     dimmed = on
     for o in overlay.overlays.values {
       o.scene.childNode(withName: "night")?.removeFromParent()
@@ -281,6 +282,7 @@ final class LimitsHUD {
   }
 
   private func celebrate() {
+    stage.noteActivity()
     for a in stage.actors.values { a.puppet.happy() }
     if settings.settings.reduceMotion || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
       return

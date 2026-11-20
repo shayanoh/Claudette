@@ -33,6 +33,26 @@ final class Actor {
 
 /// Owns every on-screen Claudette: layout, session reactions, hover fade, dodging, dragging.
 final class Stage {
+  static let activeFPS = 30
+  static let idleFPS = 8
+  private var lastActivity = Date.distantPast
+  private var currentFPS = Stage.activeFPS
+
+  /// Call whenever something lively happens so the scene renders at full speed for a few seconds.
+  func noteActivity() { lastActivity = Date() }
+
+  private func updateFrameRate() {
+    let busy =
+      Date().timeIntervalSince(lastActivity) < 3 || dragging != nil
+      || actors.values.contains {
+        !$0.props.isEmpty || $0.lastPhase != .idle && $0.lastPhase != .sleeping
+      }
+    let fps = busy ? Stage.activeFPS : Stage.idleFPS
+    guard fps != currentFPS else { return }
+    currentFPS = fps
+    overlay.setFrameRate(fps)
+  }
+
   private let overlay: OverlayController
   private let settings: SettingsStore
   private(set) var actors: [String: Actor] = [:]
@@ -100,6 +120,7 @@ final class Stage {
   // MARK: - Sessions
 
   func apply(_ changes: [SessionChange], sessions: [String: SessionState] = [:]) {
+    if !changes.isEmpty { noteActivity() }
     for change in changes {
       switch change {
       case .started(let id): addActor(id)
@@ -339,6 +360,9 @@ final class Stage {
   /// Holding Option keeps her still so she can be grabbed and dragged.
   func pointerMoved(_ p: CGPoint, modifiers: NSEvent.ModifierFlags = []) {
     lastPointer = p
+    if actors.values.contains(where: { rect($0).insetBy(dx: -300, dy: -300).contains(p) }) {
+      noteActivity()
+    }
     updateMouseTransparency(p)
     guard dragging == nil else { return }
     let s = settings.settings
@@ -417,6 +441,7 @@ final class Stage {
 
   /// 4 Hz: petting after a still hover, and dodged Claudettes wandering back home.
   private func tick() {
+    updateFrameRate()
     let now = Date()
     var needsLayout = false
     for a in actors.values {
@@ -438,6 +463,7 @@ final class Stage {
   // MARK: - Dragging
 
   func mouseDown(_ p: CGPoint) {
+    noteActivity()
     guard
       let a = actors.values.filter({ $0.visible && rect($0).contains(p) }).max(by: {
         $0.order < $1.order
