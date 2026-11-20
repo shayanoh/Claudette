@@ -126,6 +126,10 @@ extension PuppetNode {
 
   /// Backpack that fills as the context window fills.
   func setContext(_ percent: Double?, privacy: Bool) {
+    if let lib = ArtLibrary.shared, lib.asset("bag") != nil, lib.asset("bag_fill") != nil {
+      setContextArt(percent, lib: lib)
+      return
+    }
     let bag =
       (bodyPivot.childNode(withName: "bag") as? SKShapeNode)
       ?? {

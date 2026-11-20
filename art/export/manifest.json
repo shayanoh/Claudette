@@ -34,6 +34,40 @@
       ],
       "z": 0
     },
+    "bag": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "bag.png",
+      "parent": "bodyPivot",
+      "position": [
+        -82,
+        96
+      ],
+      "size": [
+        24,
+        29
+      ],
+      "z": -1
+    },
+    "bag_fill": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "bag_fill.png",
+      "parent": "bag",
+      "position": [
+        0,
+        2
+      ],
+      "size": [
+        20,
+        25
+      ],
+      "z": 0
+    },
     "blush_L": {
       "anchor": [
         0.5,
@@ -85,6 +119,30 @@
       ],
       "z": 1
     },
+    "body.sit": {
+      "anchor": [
+        0.5,
+        0.037037
+      ],
+      "file": "body_sit.png",
+      "size": [
+        158,
+        108
+      ],
+      "variantOf": "body"
+    },
+    "body.sleep_curl": {
+      "anchor": [
+        0.5,
+        0.037037
+      ],
+      "file": "body_sleep_curl.png",
+      "size": [
+        158,
+        108
+      ],
+      "variantOf": "body"
+    },
     "eye_L": {
       "anchor": [
         0.5,
@@ -97,10 +155,58 @@
         48
       ],
       "size": [
-        20,
+        26,
         36
       ],
       "z": 1
+    },
+    "eye_L.focus": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_L_focus.png",
+      "size": [
+        26,
+        36
+      ],
+      "variantOf": "eye_L"
+    },
+    "eye_L.half": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_L_half.png",
+      "size": [
+        26,
+        36
+      ],
+      "variantOf": "eye_L"
+    },
+    "eye_L.happy": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_L_happy.png",
+      "size": [
+        26,
+        36
+      ],
+      "variantOf": "eye_L"
+    },
+    "eye_L.sleep": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_L_sleep.png",
+      "size": [
+        26,
+        36
+      ],
+      "variantOf": "eye_L"
     },
     "eye_R": {
       "anchor": [
@@ -114,10 +220,104 @@
         48
       ],
       "size": [
-        20,
+        26,
         36
       ],
       "z": 1
+    },
+    "eye_R.focus": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_R_focus.png",
+      "size": [
+        26,
+        36
+      ],
+      "variantOf": "eye_R"
+    },
+    "eye_R.half": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_R_half.png",
+      "size": [
+        26,
+        36
+      ],
+      "variantOf": "eye_R"
+    },
+    "eye_R.happy": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_R_happy.png",
+      "size": [
+        26,
+        36
+      ],
+      "variantOf": "eye_R"
+    },
+    "eye_R.sleep": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "eye_R_sleep.png",
+      "size": [
+        26,
+        36
+      ],
+      "variantOf": "eye_R"
+    },
+    "jar_fill": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "jar_fill.png",
+      "parent": "jar_glass",
+      "position": [
+        0,
+        2
+      ],
+      "size": [
+        20,
+        31
+      ],
+      "z": 0
+    },
+    "jar_glass": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "jar_glass.png",
+      "size": [
+        24,
+        35
+      ],
+      "z": 1
+    },
+    "jar_lid": {
+      "anchor": [
+        0.5,
+        0.0
+      ],
+      "file": "jar_lid.png",
+      "parent": "jar_glass",
+      "position": [
+        0,
+        34
+      ],
+      "size": [
+        28,
+        9
+      ],
+      "z": 2
     },
     "leg_0": {
       "anchor": [
@@ -136,6 +336,18 @@
       ],
       "z": -1
     },
+    "leg_0.tuck": {
+      "anchor": [
+        0.5,
+        0.692308
+      ],
+      "file": "leg_0_tuck.png",
+      "size": [
+        22,
+        39
+      ],
+      "variantOf": "leg_0"
+    },
     "leg_1": {
       "anchor": [
         0.5,
@@ -152,6 +364,18 @@
         39
       ],
       "z": -1
+    },
+    "leg_1.tuck": {
+      "anchor": [
+        0.5,
+        0.692308
+      ],
+      "file": "leg_1_tuck.png",
+      "size": [
+        22,
+        39
+      ],
+      "variantOf": "leg_1"
     },
     "leg_2": {
       "anchor": [
@@ -170,6 +394,18 @@
       ],
       "z": -1
     },
+    "leg_2.tuck": {
+      "anchor": [
+        0.5,
+        0.692308
+      ],
+      "file": "leg_2_tuck.png",
+      "size": [
+        22,
+        39
+      ],
+      "variantOf": "leg_2"
+    },
     "leg_3": {
       "anchor": [
         0.5,
@@ -187,10 +423,46 @@
       ],
       "z": -1
     },
+    "leg_3.tuck": {
+      "anchor": [
+        0.5,
+        0.692308
+      ],
+      "file": "leg_3_tuck.png",
+      "size": [
+        22,
+        39
+      ],
+      "variantOf": "leg_3"
+    },
+    "moon_dark": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "moon_dark.png",
+      "size": [
+        42,
+        42
+      ],
+      "z": 0
+    },
+    "moon_lit": {
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "file": "moon_lit.png",
+      "size": [
+        38,
+        38
+      ],
+      "z": 1
+    },
     "mouth": {
       "anchor": [
         0.5,
-        0.6
+        0.533333
       ],
       "file": "mouth.png",
       "parent": "face",
@@ -199,10 +471,46 @@
         35
       ],
       "size": [
-        14,
-        10
+        20,
+        15
       ],
       "z": 1
+    },
+    "mouth.blep": {
+      "anchor": [
+        0.5,
+        0.533333
+      ],
+      "file": "mouth_blep.png",
+      "size": [
+        20,
+        15
+      ],
+      "variantOf": "mouth"
+    },
+    "mouth.o": {
+      "anchor": [
+        0.5,
+        0.533333
+      ],
+      "file": "mouth_o.png",
+      "size": [
+        20,
+        15
+      ],
+      "variantOf": "mouth"
+    },
+    "mouth.wobble": {
+      "anchor": [
+        0.5,
+        0.533333
+      ],
+      "file": "mouth_wobble.png",
+      "size": [
+        20,
+        15
+      ],
+      "variantOf": "mouth"
     },
     "shadow": {
       "anchor": [

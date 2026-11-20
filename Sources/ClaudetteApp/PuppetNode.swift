@@ -202,6 +202,9 @@ final class PuppetNode: SKNode {
     asleep = false
     removeAction(forKey: "z")
     eyes.forEach { $0.yScale = 1 }
+    setEyes(.open)
+    setMouth(nil)
+    setPose(.stand)
     let breathe = SKAction.sequence([
       .scaleY(to: 1.02, duration: 1.2), .scaleY(to: 1.0, duration: 1.2),
     ])
@@ -229,6 +232,7 @@ final class PuppetNode: SKNode {
     alpha = 0
     bodyPivot.xScale = 1.15
     bodyPivot.yScale = 0.3
+    setMouth(.o)  // yawn; idle() hides it again
     run(.fadeIn(withDuration: 0.2))
     bodyPivot.run(
       .sequence([
@@ -242,7 +246,12 @@ final class PuppetNode: SKNode {
   func sleep() {
     asleep = true
     face.removeAction(forKey: "blink")
-    eyes.forEach { $0.yScale = 0.12 }
+    if usesArt {
+      setEyes(.sleep)
+      setMouth(nil)
+    } else {
+      eyes.forEach { $0.yScale = 0.12 }
+    }
     bodyPivot.removeAction(forKey: "breathe")
     let slow = SKAction.sequence([
       .scaleY(to: 0.93, duration: 2.0), .scaleY(to: 0.97, duration: 2.0),
@@ -336,11 +345,26 @@ final class PuppetNode: SKNode {
 
   /// Happy wiggle (petted, task done).
   func happy() {
-    eyes.forEach {
-      $0.run(
+    if usesArt {
+      setEyes(.happy)
+      setMouth(.smile)
+      run(
         .sequence([
-          .scaleY(to: 0.35, duration: 0.1), .wait(forDuration: 0.8), .scaleY(to: 1, duration: 0.1),
-        ]))
+          .wait(forDuration: 0.9),
+          .run { [weak self] in
+            guard let self, !self.asleep else { return }
+            self.setEyes(.open)
+            self.setMouth(nil)
+          },
+        ]), withKey: "happyFace")
+    } else {
+      eyes.forEach {
+        $0.run(
+          .sequence([
+            .scaleY(to: 0.35, duration: 0.1), .wait(forDuration: 0.8),
+            .scaleY(to: 1, duration: 0.1),
+          ]))
+      }
     }
     let wiggle = SKAction.sequence([
       .rotate(toAngle: 0.08, duration: 0.1), .rotate(toAngle: -0.08, duration: 0.1),
