@@ -122,3 +122,12 @@ private func freshDefaults() -> UserDefaults {
   let s = SettingsStore(defaults: d).settings
   #expect(s.moonX == 0.25 && s.moonY == 0.75)
 }
+
+@Test func perchingDefaultsOnAndSurvivesOldStoredSettings() {
+  #expect(ClaudetteSettings().perchEnabled)
+  let d = freshDefaults()
+  d.set(Data(#"{"scale":1.2}"#.utf8), forKey: SettingsStore.key)
+  #expect(SettingsStore(defaults: d).settings.perchEnabled)
+  d.set(Data(#"{"perchEnabled":false}"#.utf8), forKey: SettingsStore.key)
+  #expect(!SettingsStore(defaults: d).settings.perchEnabled)
+}

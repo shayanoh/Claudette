@@ -10,6 +10,8 @@ public struct ClaudetteSettings: Codable, Equatable, Sendable {
   public var focusMode = false
   public var reduceMotion = false
   public var launchAtLogin = false
+  /// She may sit on the top edge of other windows.
+  public var perchEnabled = true
   /// Where the weekly moon was dropped, as a fraction (0...1) of the main display's visible frame;
   /// nil means its default corner. Both are set or both are nil.
   public var moonX: Double?
@@ -33,6 +35,7 @@ public struct ClaudetteSettings: Codable, Equatable, Sendable {
     focusMode = value(.focusMode, d.focusMode)
     reduceMotion = value(.reduceMotion, d.reduceMotion)
     launchAtLogin = value(.launchAtLogin, d.launchAtLogin)
+    perchEnabled = value(.perchEnabled, d.perchEnabled)
     moonX = (try? c.decodeIfPresent(Double.self, forKey: .moonX)) ?? nil
     moonY = (try? c.decodeIfPresent(Double.self, forKey: .moonY)) ?? nil
   }
