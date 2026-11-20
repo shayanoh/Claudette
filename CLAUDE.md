@@ -6,8 +6,9 @@ See `README.md` for the vision, `docs/architecture.md` for how it fits together.
 ## Decisions
 
 - Native Swift + SpriteKit, 2D rigged puppet; renderer stays swappable (3D cel-shaded later).
-- Data: Claude Code plugin with `http` hooks -> loopback server (127.0.0.1:47631); status line wrapper
-  for usage limits (`rate_limits`), context and model. No `async` on http hooks (not documented).
+- Data: Claude Code plugin whose hooks run `hooks/post.sh` (curl in the background, always exits 0, so a
+  closed app causes no hook error) -> loopback server (127.0.0.1:47631); status line wrapper for usage
+  limits (`rate_limits`), context and model. Older installs used `http` hooks (Settings offers the update).
 - Art: style "Ink & Cel" (B) + A's soft shadow; all character/visual design is produced by an
   Opus 5.5 subagent (user rule). On-screen art is the Opus-drawn export in `art/export/` (regenerate
   with `scripts/art.sh`); shape placeholders in `PuppetNode`/`Props` remain only as the fallback.
