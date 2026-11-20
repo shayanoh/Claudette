@@ -1,22 +1,33 @@
 # Claudette
 
 macOS menubar-only app: an animated avatar that visualises Claude Code activity.
-See `README.md` for the vision.
+See `README.md` for the vision, `docs/architecture.md` for how it fits together.
 
-## Decisions so far
+## Decisions
 
-- Native Swift + SpriteKit, 2D rigged puppet. Renderer stays behind a swappable interface.
-- Data source: Claude Code hooks -> local socket; transcript JSONL tailing as enrichment.
-- Priority: charm and visual quality first, glanceable status (approval, question,
-  long-running shell, error) second.
-- Art tools: VectorCraft / AniCraft / PhotoCraft MCPs; Blender at
-  `/Applications/Blender.app/Contents/MacOS/Blender` (not on PATH) for 3D.
+- Native Swift + SpriteKit, 2D rigged puppet; renderer stays swappable (3D cel-shaded later).
+- Data: Claude Code plugin with `http` hooks -> loopback server (127.0.0.1:47631); status line wrapper
+  for usage limits (`rate_limits`), context and model. No `async` on http hooks (not documented).
+- Art: style "Ink & Cel" (B) + A's soft shadow; all character/visual design is produced by an
+  Opus 5.5 subagent (user rule). Current on-screen art is placeholder shapes (`PuppetNode`, `Props`).
+- Charm first, glanceable status (approval, question, errors, limits) second.
+- Distribution: build from source, ad-hoc signed, non-sandboxed, macOS 14+, no notarisation.
+
+## Layout
+
+- `Sources/ClaudetteCore`: pure, unit-tested logic. Keep UI out of it. `swift test` must stay green.
+- `Sources/ClaudetteApp`: AppKit/SpriteKit/SwiftUI app. Verified by running it (screenshots).
+- `docs/superpowers/specs` (design), `docs/superpowers/plans` (plans), `docs/spikes/payloads.md`
+  (real hook payloads and known gaps), `design/concepts/` (concept art).
+- `scripts/bundle.sh` builds `build/Claudette.app`.
 
 ## Working rules
 
-- Process: brainstorm -> design doc in `docs/superpowers/specs/` -> plan -> build.
-  Nothing is built before the design doc is approved.
-- Concept art and other throwaway work lives in `design/concepts/`.
-- Committing in this repo is pre-approved by the user.
-- Format Swift with `swift-format`/Xcode defaults; validate input and handle errors,
-  especially for anything parsing hook payloads or transcripts.
+- Process: brainstorm -> design doc -> plan -> TDD execution. Core logic is test-first.
+- Committing in this repo is pre-approved. Do not edit the user's real `~/.claude` without their
+  consent; test installers with `CLAUDETTE_HOME=<scratch dir>` (see `docs/architecture.md`).
+- Dev switches are environment variables (`CLAUDETTE_DEBUG_*`), listed in `docs/architecture.md`.
+- Synthetic mouse clicks are blocked without Accessibility permission for the harness; moves work.
+  `CLAUDETTE_DEBUG_DRAGTEST` exercises the drag code path instead.
+- Swift is formatted with `swift format -i`; validate all external input.
+- The macOS here is an Intel i7-7820HQ: measure CPU/battery changes with `ps -o %cpu,rss`.

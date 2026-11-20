@@ -1,0 +1,44 @@
+# Using Claudette
+
+## Connect it to Claude Code
+
+Open the menubar item, choose **Settings…**, and under **Claude Code**:
+
+1. **Plugin → Install…** creates `~/.claude/skills/claudette` (hook settings that send activity to
+   Claudette on this Mac only). Start a new Claude Code session afterwards.
+2. **Usage limits → Connect…** wraps your `statusLine` command in `~/.claude/settings.json` so the
+   5-hour and weekly limits reach Claudette. Your own status line keeps working; a backup is kept;
+   **Disconnect** restores it. Limits only appear for Claude.ai Pro/Max subscribers, and only after
+   the first reply of a session.
+
+Both steps ask for confirmation first and show exactly which file they change.
+
+## What you will see
+
+- One Claudette per Claude Code session, standing along the bottom of the screen on every desktop.
+  More than six collapse into a `+N` pill.
+- Tool calls become props beside her (file read, search, edit, shell, web, skill, MCP cartridge with
+  the server name). Sub-agents appear as little copies in front of her.
+- `!` (amber, she waves) means a permission prompt is waiting; `?` (blue) means Claude asked a
+  question; a red pill names an API, sign-in, billing or rate-limit error.
+- The jar on her shoulder is the 5-hour window (fill = what is left); the moon in the top-right is the
+  weekly window. At the limit the screen dims, she naps with a "back at HH:MM" sign, and when the
+  limit lifts there is confetti. The menubar glyph mirrors both.
+- Context window = the little backpack on her left shoulder.
+
+## Playing with her
+
+- Drag her anywhere; flick her and she slides to a stop. Her spot is remembered per session.
+- Move the pointer towards her and she may dodge. **Hold Option** to keep her still so you can grab
+  her. If she is cornered, or dodging is off, she fades to about 25% while the pointer is over her.
+- Rest the pointer on her for two seconds to pet her.
+- Settings: size (50% to 200%), fade and dodge, privacy mode (hides file, project and server names),
+  Focus mode (hides her completely), Reduce motion, launch at login.
+
+## Troubleshooting
+
+- Nothing appears: check the menu says "Listening on 127.0.0.1:47631" and that you started a *new*
+  Claude Code session after installing the plugin.
+- No limits: the status line only runs while a session is open, and only subscribers get
+  `rate_limits`. A project-level `statusLine` overrides the user-level one (Settings shows a warning).
+- She covers text: leave "Fade when the pointer is over her" on, or use Focus mode.
