@@ -148,3 +148,16 @@ private func freshDefaults() -> UserDefaults {
   let s = SettingsStore(defaults: d).settings
   #expect(s.showProjectName && s.itemCap == 80)
 }
+
+@Test func autoCleanupDefaultsOnAndTheSoftLimitIsClamped() {
+  var s = ClaudetteSettings()
+  #expect(s.autoCleanup && s.clutterSoftLimit == 12)
+  s.clutterSoftLimit = 1
+  #expect(s.clamped().clutterSoftLimit == 4)
+  s.clutterSoftLimit = 999
+  #expect(s.clamped().clutterSoftLimit == 40)
+  let d = freshDefaults()
+  d.set(Data(#"{"scale":1.1}"#.utf8), forKey: SettingsStore.key)
+  let old = SettingsStore(defaults: d).settings
+  #expect(old.autoCleanup && old.clutterSoftLimit == 12)
+}
