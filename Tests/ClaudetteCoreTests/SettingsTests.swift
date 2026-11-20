@@ -88,3 +88,37 @@ private func freshDefaults() -> UserDefaults {
   #expect(seen.count == 1)
   #expect(seen.first?.dodgeEnabled == false)
 }
+
+@Test func moonPositionClampsToUnitSquare() {
+  var s = ClaudetteSettings()
+  s.moonX = 5
+  s.moonY = -2
+  let c = s.clamped()
+  #expect(c.moonX == 1)
+  #expect(c.moonY == 0)
+}
+
+@Test func halfSetOrNonFiniteMoonPositionIsDropped() {
+  var s = ClaudetteSettings()
+  s.moonX = 0.4
+  #expect(s.clamped().moonX == nil && s.clamped().moonY == nil)
+  s.moonY = .nan
+  #expect(s.clamped().moonX == nil && s.clamped().moonY == nil)
+}
+
+@Test func oldStoredSettingsKeepMoonDefault() {
+  let d = freshDefaults()
+  d.set(Data(#"{"scale":1.2}"#.utf8), forKey: SettingsStore.key)
+  let s = SettingsStore(defaults: d).settings
+  #expect(s.moonX == nil && s.moonY == nil)
+}
+
+@Test func moonPositionRoundTripsThroughTheStore() {
+  let d = freshDefaults()
+  SettingsStore(defaults: d).update {
+    $0.moonX = 0.25
+    $0.moonY = 0.75
+  }
+  let s = SettingsStore(defaults: d).settings
+  #expect(s.moonX == 0.25 && s.moonY == 0.75)
+}
