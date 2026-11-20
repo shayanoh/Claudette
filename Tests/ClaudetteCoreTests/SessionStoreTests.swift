@@ -283,3 +283,93 @@ private func status(_ session: String = "s1", model: String? = nil, ctx: Double?
   _ = s.apply(ev("StopFailure", extra: #""error":"rate_limit""#))
   #expect(s.sessions["s1"]?.phase == .error(.rateLimit))
 }
+
+// MARK: - thinking and tool results
+
+@Test func userPromptSubmitStartsThinking() {
+  let (s, _) = make()
+  let changes = s.apply(ev("UserPromptSubmit"))
+  #expect(changes.contains(.thinkingChanged("s1", true)))
+  #expect(s.sessions["s1"]?.isThinking == true)
+}
+
+@Test func toolStartEndsThinkingAndToolFinishRestartsIt() {
+  let (s, _) = make()
+  _ = s.apply(ev("UserPromptSubmit"))
+  let start = s.apply(ev("PreToolUse", tool: "Read", id: "t1"))
+  #expect(start.contains(.thinkingChanged("s1", false)))
+  #expect(s.sessions["s1"]?.isThinking == false)
+  let done = s.apply(ev("PostToolUse", tool: "Read", id: "t1"))
+  #expect(done.contains(.thinkingChanged("s1", true)))
+}
+
+@Test func stopEndsThinking() {
+  let (s, _) = make()
+  _ = s.apply(ev("UserPromptSubmit"))
+  let stop = s.apply(ev("Stop"))
+  #expect(stop.contains(.thinkingChanged("s1", false)))
+  #expect(s.sessions["s1"]?.isThinking == false)
+}
+
+@Test func thinkingFlagIsPerSession() {
+  let (s, _) = make()
+  _ = s.apply(ev("UserPromptSubmit", session: "a"))
+  _ = s.apply(ev("SessionStart", session: "b"))
+  #expect(s.sessions["a"]?.isThinking == true)
+  #expect(s.sessions["b"]?.isThinking == false)
+}
+
+@Test func waitingForApprovalIsNotThinking() {
+  let (s, _) = make()
+  _ = s.apply(ev("UserPromptSubmit"))
+  _ = s.apply(ev("PermissionRequest"))
+  #expect(s.sessions["s1"]?.isThinking == false)
+}
+
+private func result(_ changes: [SessionChange]) -> ToolResult? {
+  for c in changes { if case .toolResult(_, _, let r) = c { return r } }
+  return nil
+}
+
+@Test func bashResultCarriesDurationAndSummary() {
+  let (s, _) = make()
+  _ = s.apply(ev("PreToolUse", tool: "Bash", id: "b1", input: #"{"command":"echo done"}"#))
+  let changes = s.apply(
+    ev(
+      "PostToolUse", tool: "Bash", id: "b1",
+      extra: #""duration_ms":15286,"tool_response":{"stdout":"done","stderr":""}"#))
+  #expect(result(changes) == ToolResult(success: true, durationMs: 15286, summary: "done"))
+}
+
+@Test func failureResultUsesTheErrorText() {
+  let (s, _) = make()
+  _ = s.apply(ev("PreToolUse", tool: "Bash", id: "b1"))
+  let changes = s.apply(
+    ev("PostToolUseFailure", tool: "Bash", id: "b1", extra: #""error":"Exit code 1\nboom""#))
+  #expect(
+    result(changes) == ToolResult(success: false, durationMs: nil, summary: "Exit code 1\nboom"))
+}
+
+@Test func missingToolResponseGivesNilSummary() {
+  let (s, _) = make()
+  _ = s.apply(ev("PreToolUse", tool: "Read", id: "r1"))
+  let changes = s.apply(ev("PostToolUse", tool: "Read", id: "r1"))
+  #expect(result(changes) == ToolResult(success: true, durationMs: nil, summary: nil))
+}
+
+@Test func summaryIsTheLast200Characters() {
+  let (s, _) = make()
+  _ = s.apply(ev("PreToolUse", tool: "Bash", id: "b1"))
+  let long = String(repeating: "a", count: 400) + String(repeating: "z", count: 200)
+  let changes = s.apply(
+    ev("PostToolUse", tool: "Bash", id: "b1", extra: #""tool_response":{"stdout":"\#(long)"}"#))
+  let summary = result(changes)?.summary
+  #expect(summary?.count == 200)
+  #expect(summary == String(repeating: "z", count: 200))
+}
+
+@Test func unknownToolUseIDEmitsNoResult() {
+  let (s, _) = make()
+  let changes = s.apply(ev("PostToolUse", tool: "Bash", id: "never-started"))
+  #expect(result(changes) == nil)
+}

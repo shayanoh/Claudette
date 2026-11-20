@@ -18,6 +18,42 @@ public struct ToolActivity: Equatable, Sendable {
   public let isBackground: Bool
 }
 
+/// How a tool call ended; `summary` is at most the last 200 characters of its output or error.
+public struct ToolResult: Equatable, Sendable {
+  public var success: Bool
+  public var durationMs: Int?
+  public var summary: String?
+
+  public init(success: Bool, durationMs: Int?, summary: String?) {
+    self.success = success
+    self.durationMs = durationMs
+    self.summary = summary
+  }
+
+  static let summaryLimit = 200
+
+  /// Bash output lives in `tool_response.stdout`/`stderr`, failures in `error` (see
+  /// docs/spikes/payloads.md); other tools have no text we trust, so they give no summary.
+  static func from(_ e: HookEvent, success: Bool) -> ToolResult {
+    var text = e.raw["error"]?.stringValue
+    if text == nil, let r = e.raw["tool_response"] {
+      for key in ["stdout", "stderr"] {
+        if let t = r[key]?.stringValue, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          text = t
+          break
+        }
+      }
+    }
+    let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let summary = trimmed.flatMap { $0.isEmpty ? nil : String($0.suffix(summaryLimit)) }
+    // Clamp before converting: Int(_:) traps on huge or non-finite doubles.
+    let duration = e.raw["duration_ms"]?.doubleValue.flatMap {
+      $0.isFinite ? Int(max(0, min($0, 1e9))) : nil
+    }
+    return ToolResult(success: success, durationMs: duration, summary: summary)
+  }
+}
+
 public struct SessionState: Equatable, Sendable {
   public let id: String
   public var cwd: String?
@@ -26,6 +62,8 @@ public struct SessionState: Equatable, Sendable {
   public var subagents: Set<String>
   public var model: String?
   public var contextUsedPercentage: Double?
+  /// A turn is running but no tool is active and nothing waits for the user.
+  public var isThinking = false
   public let startedAt: Date
   public var lastEventAt: Date
 }
@@ -36,6 +74,8 @@ public enum SessionChange: Equatable, Sendable {
   case phaseChanged(String, SessionPhase)
   case toolStarted(String, ToolActivity)
   case toolFinished(String, toolUseID: String, success: Bool)
+  case toolResult(String, toolUseID: String, ToolResult)
+  case thinkingChanged(String, Bool)
   case longShell(String, toolUseID: String)
   case subagentStarted(String, agentID: String)
   case subagentStopped(String, agentID: String)
@@ -242,7 +282,10 @@ public final class SessionStore {
     if let a = entries[id]!.attention, a == .needsApproval || a == .hasQuestion {
       entries[id]!.attention = nil
     }
-    return [.toolFinished(id, toolUseID: toolID, success: success)]
+    return [
+      .toolFinished(id, toolUseID: toolID, success: success),
+      .toolResult(id, toolUseID: toolID, ToolResult.from(e, success: success)),
+    ]
   }
 
   private func finishAllTools(id: String, success: Bool) -> [SessionChange] {
@@ -267,6 +310,11 @@ public final class SessionStore {
     if phase != entry.state.phase {
       entries[id]!.state.phase = phase
       changes.append(.phaseChanged(id, phase))
+    }
+    let thinking = entry.turnActive && entry.state.activeTools.isEmpty && entry.attention == nil
+    if thinking != entry.state.isThinking {
+      entries[id]!.state.isThinking = thinking
+      changes.append(.thinkingChanged(id, thinking))
     }
   }
 

@@ -40,6 +40,16 @@ Headless (`-p`) mode only so far; interactive-only behaviour is listed under "No
 
 - **Visible over true full-screen apps** (confirmed by the user, 2026-11-20).
 
+## Tool results (scene polish, Task 6; from the captured logs of 2026-11-20)
+
+- **Bash `PostToolUse.tool_response`** = `{stdout, stderr, noOutputExpected, isImage, interrupted}`; **no exit code** on
+  success. A non-zero exit arrives as `PostToolUseFailure.error` (`"Exit code 1\n<output>"`). `duration_ms` is on
+  `PostToolUse`.
+- **Grep `tool_response`** = `{mode, totalLines, numFiles, numLines, content, filenames}`; Read's is similar. Only Bash
+  output (and `error`) is used for the result tooltip; other tools give status and duration only.
+- `SessionStore` turns these into `ToolResult(success, durationMs, summary)` (summary = last 200 characters) and a per-session
+  `isThinking` flag (turn running, no tool active, nothing waiting for the user).
+
 ## Not yet confirmed (need an interactive session or a forced failure)
 
 - `SessionStart` did **not** arrive in `-p` mode (SessionStore must auto-create sessions from any event; it does).
