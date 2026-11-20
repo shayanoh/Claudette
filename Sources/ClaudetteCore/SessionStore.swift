@@ -16,6 +16,8 @@ public struct ToolActivity: Equatable, Sendable {
   public let input: JSONValue?
   public let startedAt: Date
   public let isBackground: Bool
+  /// Set for tool calls made inside a sub-agent.
+  public var agentID: String? = nil
 }
 
 /// How a tool call ended; `summary` is at most the last 200 characters of its output or error.
@@ -263,7 +265,8 @@ public final class SessionStore {
     if !entries[id]!.state.activeTools.contains(where: { $0.toolUseID == toolID }) {
       let tool = ToolActivity(
         toolUseID: toolID, toolName: name, mcpServer: e.mcpServerName, input: e.toolInput,
-        startedAt: t, isBackground: e.toolInput?["run_in_background"]?.boolValue == true)
+        startedAt: t, isBackground: e.toolInput?["run_in_background"]?.boolValue == true,
+        agentID: e.agentID)
       entries[id]!.state.activeTools.append(tool)
       changes.append(.toolStarted(id, tool))
     }

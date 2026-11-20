@@ -373,3 +373,28 @@ private func result(_ changes: [SessionChange]) -> ToolResult? {
   let changes = s.apply(ev("PostToolUse", tool: "Bash", id: "never-started"))
   #expect(result(changes) == nil)
 }
+
+@Test func toolInsideASubagentCarriesItsAgentID() {
+  let (s, _) = make()
+  let inside = s.apply(
+    ev("PreToolUse", tool: "Read", id: "t1", extra: #""agent_id":"ag1","agent_type":"x""#))
+  guard
+    case .toolStarted(_, let tool)? = inside.first(where: {
+      if case .toolStarted = $0 { return true } else { return false }
+    })
+  else {
+    Issue.record("no toolStarted")
+    return
+  }
+  #expect(tool.agentID == "ag1")
+  let main = s.apply(ev("PreToolUse", tool: "Read", id: "t2"))
+  guard
+    case .toolStarted(_, let tool2)? = main.first(where: {
+      if case .toolStarted = $0 { return true } else { return false }
+    })
+  else {
+    Issue.record("no toolStarted")
+    return
+  }
+  #expect(tool2.agentID == nil)
+}
