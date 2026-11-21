@@ -1,5 +1,8 @@
 # Claudette
 
+[![CI](https://github.com/shayanoh/Claudette/actions/workflows/ci.yml/badge.svg)](https://github.com/shayanoh/Claudette/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A macOS menubar-only app (no Dock icon) that gives Claude Code a face: a cute, animated
 Claude-mascot avatar that lives on your desktop and acts out what Claude Code is doing.
 
@@ -25,6 +28,7 @@ Claude-mascot avatar that lives on your desktop and acts out what Claude Code is
 ## Build and run
 
 Requirements: macOS 14+, Xcode command line tools with Swift 6, Claude Code.
+Clone with `git clone https://github.com/shayanoh/Claudette.git`.
 
 ```bash
 scripts/bundle.sh          # builds build/Claudette.app (ad-hoc signed, no notarisation)
@@ -65,3 +69,7 @@ documentation but not yet from live traffic.
 - `Sources/ClaudetteApp`: AppKit/SpriteKit/SwiftUI app.
 - `docs/`: design (`superpowers/specs`), plan (`superpowers/plans`), `architecture.md`, `usage.md`.
 - `design/concepts/`: concept art, including the Opus design sheets.
+
+## License
+
+[MIT](LICENSE)
