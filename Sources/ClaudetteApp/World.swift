@@ -251,7 +251,7 @@ final class World {
   func settle(_ node: ItemNode, at center: CGPoint) -> (
     center: CGPoint, scenePosition: CGPoint
   ) {
-    let size = ItemNode.footprint
+    let size = node.extent
     let fitted = ScreenFit.clamp(
       CGPoint(x: center.x - size.width / 2, y: center.y - size.height / 2), size: size,
       to: stage.screenFrames)
@@ -382,7 +382,7 @@ final class World {
     for off in [0.0, 35, -35, 70, -70, 110, -110] {
       let a = ang + off * .pi / 180
       let cand = CGPoint(x: c.x + step * cos(a), y: c.y + step * sin(a))
-      let size = ItemNode.footprint
+      let size = node.extent
       let fitted = ScreenFit.clamp(
         CGPoint(x: cand.x - size.width / 2, y: cand.y - size.height / 2), size: size,
         to: stage.screenFrames)

@@ -331,8 +331,10 @@ final class Stage {
   func setFeet(_ a: Actor, _ p: CGPoint) {
     guard p.x.isFinite, p.y.isFinite else { return }
     let k = scale * a.sizeFactor
-    a.origin = CGPoint(
-      x: p.x + PuppetNode.hitBounds.minX * k, y: p.y + PuppetNode.hitBounds.minY * k)
+    // Her whole body (not just her feet) stays on the screen, whatever the planner asked for.
+    a.origin = ScreenFit.clamp(
+      CGPoint(x: p.x + PuppetNode.hitBounds.minX * k, y: p.y + PuppetNode.hitBounds.minY * k),
+      size: size(of: a), to: screenFrames)
     if let d = display(at: p), d != a.display {
       a.display = d
       applyDisplayParent(a)

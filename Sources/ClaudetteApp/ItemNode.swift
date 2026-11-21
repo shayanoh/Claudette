@@ -49,6 +49,13 @@ final class ItemNode: SKNode, Draggable {
   private var typeFactor: CGFloat { isTerminal ? 1.3 : 1 }
   private var uiScale: CGFloat = 1
 
+  /// The room the item and its caption really take at its final size (the caption is wider than
+  /// the prop): what must stay on screen.
+  var extent: CGSize {
+    let k = uiScale * typeFactor
+    return CGSize(width: Self.spacing.width * k, height: Self.spacing.height * k)
+  }
+
   func setUIScale(_ s: CGFloat) {
     uiScale = s
     setScale(s * typeFactor)

@@ -106,7 +106,9 @@ final class CaretTracker {
     "/usr/local/bin/zellij", "/opt/homebrew/bin/zellij",
     NSHomeDirectory() + "/Applications/Zellij.app/Contents/MacOS/zellij",
   ]
-  private static var session: (name: String, at: Date)?  // only touched on `queue`
+  // Both only touched on `queue`.
+  private static var session: (name: String, at: Date)?
+  private static var cells: (panes: Data, tabs: Data, at: Date)?
 
   private static func zellijCaret() -> CGPoint? {
     guard let app = NSWorkspace.shared.frontmostApplication,
@@ -131,11 +133,17 @@ final class CaretTracker {
       let live = list.split(separator: "\n").first { !$0.contains("EXITED") }
       session = (String(live?.split(separator: " ").first ?? ""), Date())
     }
-    guard let name = session?.name, !name.isEmpty,
-      let panes = run(exe, ["--session", name, "action", "list-panes", "-a", "-t", "--json"]),
-      let tabs = run(exe, ["--session", name, "action", "list-tabs", "-a", "--json"]),
-      let top = ZellijCaret.point(
-        panes: Data(panes.utf8), tabs: Data(tabs.utf8), window: frame)
+    // Spawning `zellij` is the costly part: refresh the cursor cell every 1.5 s, but re-map it
+    // onto the live window frame on every tick so moving the window still tracks.
+    if cells == nil || Date().timeIntervalSince(cells!.at) > 1.5 {
+      guard let name = session?.name, !name.isEmpty,
+        let panes = run(exe, ["--session", name, "action", "list-panes", "-a", "-t", "--json"]),
+        let tabs = run(exe, ["--session", name, "action", "list-tabs", "-a", "--json"])
+      else { return nil }
+      cells = (Data(panes.utf8), Data(tabs.utf8), Date())
+    }
+    guard let cells,
+      let top = ZellijCaret.point(panes: cells.panes, tabs: cells.tabs, window: frame)
     else { return nil }
     let screenHeight = NSScreen.screens.first?.frame.height ?? 0
     return CGPoint(x: top.x, y: screenHeight - top.y)  // AX is top-left origin
