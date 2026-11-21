@@ -153,6 +153,23 @@ final class Stage {
     CGSize(width: spriteSize.width * a.sizeFactor, height: spriteSize.height * a.sizeFactor)
   }
 
+  /// Keeps everything she draws on screen: her body plus what hangs off it (the thinking bubble
+  /// above and right of her head, the project name tag under her feet, which can be wider than she
+  /// is). `origin` is her hit rect's lower-left, as in `Actor.origin`.
+  func fitOrigin(_ origin: CGPoint, of a: Actor) -> CGPoint {
+    let k = scale * a.sizeFactor
+    let body = size(of: a)
+    let tag = a.nameTag?.size ?? .zero
+    let right = 19 * k  // the thinking bubble sticks out to the right of the hit rect
+    let top = 53 * k  // ...and above it (sparkles included)
+    let side = max(0, (tag.width - body.width) / 2)
+    let outer = CGSize(
+      width: body.width + right + 2 * side, height: body.height + top + tag.height)
+    let fitted = ScreenFit.clamp(
+      CGPoint(x: origin.x - side, y: origin.y - tag.height), size: outer, to: screenFrames)
+    return CGPoint(x: fitted.x + side, y: fitted.y + tag.height)
+  }
+
   private func rect(_ a: Actor) -> CGRect { CGRect(origin: a.origin, size: size(of: a)) }
 
   func display(at point: CGPoint) -> CGDirectDisplayID? {
@@ -332,9 +349,9 @@ final class Stage {
     guard p.x.isFinite, p.y.isFinite else { return }
     let k = scale * a.sizeFactor
     // Her whole body (not just her feet) stays on the screen, whatever the planner asked for.
-    a.origin = ScreenFit.clamp(
+    a.origin = fitOrigin(
       CGPoint(x: p.x + PuppetNode.hitBounds.minX * k, y: p.y + PuppetNode.hitBounds.minY * k),
-      size: size(of: a), to: screenFrames)
+      of: a)
     if let d = display(at: p), d != a.display {
       a.display = d
       applyDisplayParent(a)
@@ -422,7 +439,7 @@ final class Stage {
     scene.addChild(tag)
     tag.run(.fadeIn(withDuration: 0.12))
     a.nameTag = tag
-    placeNameTag(a)
+    setFeet(a, feet(of: a))  // a wide tag near an edge pulls her inward
   }
 
   /// Keeps the tag centred under her feet as she moves.
@@ -435,11 +452,9 @@ final class Stage {
   /// Keeps her feet at `p` inside a screen (a walk target near the edge must stay reachable).
   func clampFeet(_ p: CGPoint, of a: Actor) -> CGPoint {
     let k = scale * a.sizeFactor
-    let size = CGSize(
-      width: PuppetNode.hitBounds.width * k, height: PuppetNode.hitBounds.height * k)
     let origin = CGPoint(
       x: p.x + PuppetNode.hitBounds.minX * k, y: p.y + PuppetNode.hitBounds.minY * k)
-    let fitted = ScreenFit.clamp(origin, size: size, to: screenFrames)
+    let fitted = fitOrigin(origin, of: a)
     return CGPoint(
       x: fitted.x - PuppetNode.hitBounds.minX * k, y: fitted.y - PuppetNode.hitBounds.minY * k)
   }
@@ -483,7 +498,7 @@ final class Stage {
       {
         a.display = id
       }
-      a.origin = ScreenFit.clamp(a.origin, size: spriteSize, to: screenFrames)
+      a.origin = fitOrigin(a.origin, of: a)
       applyDisplayParent(a)
     }
     relayout()
@@ -781,17 +796,17 @@ final class Stage {
     if hypot(v.dx, v.dy) > 200 {
       let path = DragPhysics.glide(
         from: a.origin, velocity: v, screen: frame, spriteSize: size(of: a))
-      a.origin = path.last ?? a.origin
+      a.origin = fitOrigin(path.last ?? a.origin, of: a)
       let steps = path.map { point -> SKAction in
         let saved = a.origin
-        a.origin = point
+        a.origin = fitOrigin(point, of: a)
         let target = scenePosition(a)
         a.origin = saved
         return .move(to: target, duration: 1.0 / 60)
       }
       a.puppet.run(.sequence(steps), withKey: "move")
     } else {
-      a.origin = ScreenFit.clamp(a.origin, size: size(of: a), to: screenFrames)
+      a.origin = fitOrigin(a.origin, of: a)
       a.puppet.run(.move(to: scenePosition(a), duration: 0.1), withKey: "move")
     }
     a.puppet.drop()
