@@ -39,8 +39,10 @@ final class AppModel {
     _ = stage
     _ = hud
     stage.settingsChanged()  // applies a saved Focus mode and size right away
-    let server = FeedServer(port: Self.feedPort) { [weak self] message in
-      DispatchQueue.main.async { self?.handle(message) }
+    // The model is only touched on the main queue; the compiler cannot see that.
+    nonisolated(unsafe) weak var model = self
+    let server = FeedServer(port: Self.feedPort) { message in
+      DispatchQueue.main.async { model?.handle(message) }
     }
     do {
       try server.start()

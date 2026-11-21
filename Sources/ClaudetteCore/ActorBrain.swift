@@ -101,7 +101,7 @@ public struct Brain: Sendable {
   ) -> [Intent] {
     let here = fit(actor.position, screens)
     switch event {
-    case .toolStarted(let item, let isNew, let move):
+    case .toolStarted(let item, _, let move):
       var out: [Intent] = []
       if actor.holding != nil { out.append(.putDown(at: here)) }
       guard let pos = item.position, pos.x.isFinite, pos.y.isFinite else {
