@@ -625,6 +625,7 @@ final class Stage {
   func caretMoved(_ p: CGPoint?) {
     guard let p, settings.settings.dodgeTextCursor, dragging == nil else { return }
     for a in allActors { dodgeFrom(p, a) }
+    if !reduceMotion { world.dodgeItems(from: p) }  // items keep clear of it too
   }
 
   private func updateMouseTransparency(_ p: CGPoint) {
